@@ -1,0 +1,126 @@
+.animationWipe {
+  width: 100%;
+  height: 100vh;
+  position: fixed;
+  top: -100vh;
+  right: 0;
+  z-index: 100;
+}
+.animationWipe .box1,
+.animationWipe .box2 {
+  display: block;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+.animationWipe .box1:before,
+.animationWipe .box2:before {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: rgb(247, 247, 247);
+  transition: height 0.5s 0.1s ease-out;
+}
+.animationWipe .box1:after,
+.animationWipe .box2:after {
+  content: "";
+  display: block;
+  width: 0;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: rgb(247, 247, 247);
+  transition: width 0.5s 0.1s ease-out;
+}
+.animationWipe .box2 {
+  z-index: 2;
+}
+.animationWipe .box2:before {
+  top: auto;
+  bottom: 0;
+}
+.animationWipe .box2:after {
+  right: auto;
+  left: 0;
+}
+.animationWipe .loader {
+  display: block;
+  width: 100px;
+  height: 100px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-27deg);
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 0.1s ease-out;
+}
+.animationWipe .loader svg {
+  display: block;
+  width: 100%;
+}
+.animationWipe.top {
+  top: 0;
+}
+.animationWipe.show .box1:before,
+.animationWipe.show .box2:before {
+  height: 100%;
+  transition: height 0.5s ease-in;
+}
+.animationWipe.show .box1:after,
+.animationWipe.show .box2:after {
+  width: 100%;
+  transition: width 0.5s ease-in;
+}
+.animationWipe.show .loader {
+  opacity: 1;
+  transition: opacity 0.1s 0.5s ease-in;
+}
+
+.displayContent {
+  background: #F8C1C6;
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.5s ease-out;
+}
+.displayContent h1 {
+color: #fff;
+    font-family: Montserrat, sans-serif;
+    font-size: 58px;
+    text-transform: uppercase;
+    font-weight: 300;
+}
+.displayContent .buttonWrap {
+  margin-top: 60px;
+  text-align: center;
+}
+.displayContent .buttonWrap button {
+  display: inline-block;
+  background:rgb(247, 247, 247);
+  border: 0;
+  border-radius: 0;
+  padding: 40px 80px;
+  margin: 0;
+  box-shadow: 0px 8px 8px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  font-family: Montserrat, sans-serif;
+  font-size: 60px;
+  text-transform: uppercase;
+  color:#000000;
+  font-weight: 300;;
+}
+.displayContent.active {
+  transform: scale(50%);
+  transition: transform 0.5s ease-in;
+}

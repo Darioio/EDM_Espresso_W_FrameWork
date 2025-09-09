@@ -1,0 +1,615 @@
+/*
+  Global style sheet for the EDM Expresso web application. The goal
+  is to provide a modern, premium look with subtle shadows, rounded
+  corners and smooth micro‑interactions. Colours and typography
+  variables are defined on the :root selector for easy theming.
+*/
+
+:root {
+  --color-bg: #f5f6fa;
+  --color-surface: #ffffff;
+  --color-primary: #718ec0;
+  --color-primary-dark: #3f5b80;
+  --color-accent: #9aabd1;
+  --color-accent-dark: #8a99bf;
+  --color-accent-light: #d6dee9;
+  --color-text: #333333;
+  --radius-large: 12px;
+  --radius-small: 6px;
+  --shadow-light: 0 2px 4px rgba(0, 0, 0, 0.05);
+  --shadow-medium: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+html, body {
+  padding: 0;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  min-height: 100%;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/*
+  The page container now uses a two‑column layout: a left panel for
+  editing controls (accordion sections) and a right panel for the
+  live preview. The main element simply provides a wrapper with
+  internal padding and centres the content. The explicit max‑width
+  restriction has been removed to allow the editor to span the full
+  viewport width, giving the preview ample space on larger screens.
+*/
+main {
+  /* Allow the main container to occupy the full viewport. The margin and
+     border radius have been removed so the editor spans the full width
+     and height. Padding provides internal spacing around the content. */
+  padding: 1.5rem;
+  width: calc(100%);
+  height: calc(100vh);
+  display: flex;
+  flex-direction: column;
+  /* Prevent scrollbars in the main container */
+  overflow: hidden;
+}
+
+/* Container for the two panels: left (accordion editor) and right (preview).
+   Uses flexbox to allow flexible resizing of each column. A gap
+   separates the panels for visual breathing room. The height is set
+   relative to the viewport to ensure the right panel can scroll if
+   content overflows. */
+.page-container {
+  display: flex;
+  gap: 2rem;
+  height: 100%;
+}
+
+/* Left panel holds the accordion. It has a fixed maximum width to
+   prevent the preview from becoming too narrow on large screens.
+   Overflow is set to auto to allow scrolling if the content exceeds
+   the available space. */
+.left-panel {
+  flex: 0 0 410px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+/* Right panel contains the live preview and the code view. It grows
+   to fill the remaining space. Overflow auto allows the preview to
+   scroll independently of the left panel. */
+.right-panel {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Accordion sections encapsulate each email part (header, body,
+   footer). They are bordered and slightly elevated for distinction.
+   Only one section is expanded at a time. */
+.accordion-section {
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-small);
+  margin-bottom: 1rem;
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-light);
+}
+
+/* Accordion headers are clickable and control the expansion of
+   their associated content. Use flex to space the title and
+   optional icons or arrows. */
+.accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  font-weight: 600;
+  border-bottom: 1px solid #e5e7eb;
+  transition: background-color 0.2s;
+}
+.accordion-header:hover {
+  background-color: #f9fafb;
+}
+
+/* Accordion content holds the controls for each section. It has
+   internal padding. */
+.accordion-content {
+  padding: 1rem;
+}
+
+/* Template row: holds the template selector and action icons. The
+   select element grows to fill available space. */
+.template-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.template-select {
+  flex: 0 0 70%;
+  min-width: 0;
+}
+
+/* Buttons rendered as bare icons. They are styled transparently and
+   highlight on hover. */
+.icon-button {
+  background-color: transparent;
+  color: var(--color-primary);
+  border: none;
+  cursor: pointer;
+  padding: 0.4rem;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+.icon-button:hover {
+  color: var(--color-primary-dark);
+}
+.icon-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* New template form container. Hidden by default; shown when the
+   corresponding state is true. Includes margins and separates
+   action buttons into their own row. */
+.new-template-form {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+.new-template-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+/* Preview bar at the top of the right panel. Contains the title and
+   icons to switch between preview and code modes as well as copy
+   functionality. */
+.preview-bar {
+  /* Fixed preview bar across the right panel. Position fixed so it stays
+     pinned at the top of the preview area. The width uses
+     -webkit-fill-available to span the available space. Center the
+     content and leave space on the right for icons. */
+  position: fixed;
+  width: -webkit-fill-available;
+  margin-right: 1.5rem;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+    background: var(--color-bg);
+    z-index: 1;
+    padding-bottom: 0.5rem;
+    padding-left: 70px;
+}
+.preview-bar h2{
+    font-weight: 300;
+}
+
+/* Code block container for the code view on the right panel. It
+   ensures proper padding and scrolling of long code segments. */
+/* The old .code-block class is unused now; code view uses an
+   accordion with .code-section elements instead. */
+.code-block {
+  display: none;
+}
+
+/* Code accordion styles. Each code section mirrors the styling of
+   the left‑side accordion but tailored for code blocks. Sections
+   are separated with a small gap and have a light border and
+   rounded corners. */
+.code-section {
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-small);
+  overflow: hidden;
+  background-color: #ffffff;
+}
+.code-section + .code-section {
+  margin-top: 0.5rem;
+}
+.code-section-header {
+  background-color: #f9fafb;
+  padding: 0.6rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  border-bottom: 1px solid #e5e7eb;
+}
+.code-section-header:hover {
+  background-color: #f3f4f6;
+}
+.code-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.code-section pre {
+  margin: 0;
+  background-color: #ffffff;
+  padding: 0.5rem 1rem;
+}
+
+/*
+  Responsive stacking for two-column modules. The email templates
+  include an inline style block that assigns .stack-cols to image
+  and copy columns. Mirror that behaviour in the preview by
+  applying the same class. On narrow screens (<=600px) these
+  columns become block-level, span the full width and gain
+  bottom padding. This ensures the image appears above its
+  description on mobile just like in the final email.
+*/
+@media only screen and (max-width: 600px) {
+  .stack-cols {
+    display: block !important;
+    width: 100% !important;
+    padding: 0 0 16px 0 !important;
+  }
+
+  /* Ensure colour swatches remain right aligned on small screens */
+  .color-swatches {
+    text-align: right !important;
+  }
+}
+
+/* Black overlay for the brand customisation panel. Covers the page
+   with a semi‑transparent backdrop. Clicking the overlay closes
+   the panel. */
+.black-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.black-overlay.open {
+  opacity: 1;
+}
+
+/* Sliding panel for brand customisation. Initially off screen to the
+   left; when open it translates into view. The panel overlays the
+   left panel but remains above the black overlay. */
+.brand-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 410px;
+  height: 100%;
+  background: #ffffff;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2);
+  padding: 1rem;
+  overflow-y: auto;
+  z-index: 1000;
+  transform: translateX(-100%);
+  transition: all 0.3s ease;
+}
+.brand-panel.open {
+  transform: translateX(0);
+}
+
+/* Notification container and individual notification styling. The
+   notifications appear in the top right corner and fade out
+   automatically after a few seconds. */
+.notifications-container {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.notification {
+  background: #333333;
+  color: #ffffff;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-small);
+  box-shadow: var(--shadow-light);
+  font-size: 0.9rem;
+  opacity: 0;
+  animation: fadein 0.3s forwards;
+}
+@keyframes fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Fade-in animation for page transitions */
+.fade-in {
+  opacity: 0;
+  animation: fadein 0.9s ease-in forwards;
+  animation-delay: 0.7s;
+}
+
+h1, h2, h3 {
+  margin: 0 0 0.5rem 0;
+}
+
+section {
+  margin-bottom: 2rem;
+}
+
+label {
+  font-weight: 500;
+}
+
+input[type="text"],
+input[type="url"],
+textarea,
+select {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: var(--radius-small);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.95rem;
+  margin-bottom: 0.5rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+input[type="text"]:focus,
+input[type="url"]:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-accent-light);
+}
+
+button {
+  background-color: var(--color-primary);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-small);
+  padding: 0.6rem 1.2rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+  /* Only animate background colour; remove transform from the transition to prevent motion */
+  transition: background-color 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+}
+
+button:hover:not(:disabled) {
+  /* On hover, only change the background colour; do not move the button */
+  background-color: var(--color-primary-dark);
+  color:#ffffff;
+}
+
+button:active:not(:disabled) {
+  /* Prevent any positional shift on active state */
+  transform: none;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+textarea[readonly] {
+  background-color: #f9fafb;
+  color: #444444;
+}
+
+/* Flex container for URL inputs */
+.url-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.url-row button {
+  background-color: transparent;
+  color: var(--color-primary);
+  padding: 0;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.url-row button:hover {
+  color: var(--color-primary-dark);
+}
+
+/* Toggle switch component */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 20px;
+}
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.toggle-switch .slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #d1d5db;
+  transition: 0.2s;
+  border-radius: 20px;
+}
+.toggle-switch .slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background-color: #ffffff;
+  transition: 0.2s;
+  border-radius: 50%;
+}
+.toggle-switch input:checked + .slider {
+  background-color: var(--color-primary);
+}
+.toggle-switch input:checked + .slider:before {
+  transform: translateX(20px);
+}
+
+/* Modern range slider */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 60px;
+  height: 4px;
+  background: #d1d5db;
+  border-radius: 2px;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+}
+/* Divider for adding new templates */
+.divider {
+  border-top: 1px solid #e5e7eb;
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+/* Editor tabs for header/body/footer and preview/code tab controls */
+.editor-tabs, .preview-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.editor-tabs button,
+.preview-tabs button {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-small);
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.editor-tabs button.active,
+.preview-tabs button.active {
+  background-color: var(--color-primary);
+  color: #ffffff;
+}
+
+.editor-tabs button:disabled,
+.preview-tabs button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ------------------------------------------------------------------ */
+/* Additional global styles for the product table modules.
+   These classes are derived from the original module.css and are used by
+   ProductTableModule to implement the image selector overlay and edit
+   icon. Defining them here avoids importing global CSS within a
+   component, which Next.js prohibits. */
+
+/* Edit icon overlay positioned on the bottom-right of an image container. */
+.edit-icon {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: #ffffff;
+  border-radius: 50%;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.edit-icon:hover {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+/* Modal overlay for selecting an alternate image. Covers the viewport
+   (or right panel when constrained via inline styles) with a semi-
+   transparent backdrop. */
+.image-selector-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+/* Container for image thumbnails within the selector overlay. */
+.image-selector {
+  background-color: #ffffff;
+  padding: 1rem;
+  border-radius: var(--radius-large);
+  max-width: 90%;
+  max-height: 80%;
+  overflow-y: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+/* Individual thumbnail images in the selector. Maintains aspect ratio
+   and provides a hover zoom effect. */
+.image-selector img {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: var(--radius-small);
+  box-shadow: var(--shadow-light);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.image-selector img:hover {
+  transform: scale(1.05);
+}
+
+
+@media only screen and (max-width: 1000px) {
+  .stack-cols {
+    display:block !important;
+    width:100% !important;
+    padding:0 0 16px 0 !important;
+  }
+  .color-swatches {
+    text-align:right !important;
+  }
+}

@@ -1,0 +1,217 @@
+/*
+  Styles specific to product modules used in the preview. Each module
+  is a card with an image and textual content. The layout alternates
+  between image left/copy right and copy left/image right via the
+  .reverse class. Colour swatches are always right aligned thanks to
+  auto margins. Hover states are provided for the CTA button.
+*/
+
+.module {
+  display: flex;
+  background-color: var(--color-surface);
+  border-radius: var(--radius-large);
+  box-shadow: var(--shadow-light);
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+  transition: box-shadow 0.2s, transform 0.15s;
+}
+
+/* Slight lift on hover for micro‑interaction */
+.module:hover {
+  box-shadow: var(--shadow-medium);
+  transform: translateY(-2px);
+}
+
+.module.reverse {
+  flex-direction: row-reverse;
+}
+
+.module .image {
+  width: 50%;
+  position: relative;
+}
+
+.module .image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.module .content {
+  width: 50%;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Pretitle styling removed: the pretitle field is no longer displayed in modules */
+
+.module .title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0 0 0.4rem 0;
+}
+
+.module .price {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.4rem 0;
+}
+
+/* Original price styling with strikethrough and muted colour */
+.module .original-price {
+  text-decoration: line-through;
+  color: #999999;
+  margin-right: 0.4rem;
+  font-size: 0.9rem;
+}
+
+/* Sale price inherits the default price styling but is displayed inline */
+.module .sale-price {
+  font-weight: 600;
+}
+
+.module .description {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #555555;
+  margin-bottom: 0.7rem;
+  flex-grow: 1;
+}
+
+.module .cta-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.module .button {
+  background-color: var(--color-accent);
+  color: #ffffff;
+  padding: 0.6rem 1.2rem;
+  text-decoration: none;
+  border-radius: var(--radius-small);
+  transition: background-color 0.2s;
+  font-size: 0.9rem;
+}
+
+/* Provide a subtle darker tone on hover. CSS does not support
+   darken() natively, so we specify a fixed darker colour. */
+.module .button:hover {
+  /* Shade effect on hover: darken the accent slightly and add an inset shadow */
+  background-color: var(--color-accent-dark);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Edit icon overlay positioned on the bottom-right of the image */
+.module .image .edit-icon {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: #ffffff;
+  border-radius: 50%;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.module .image .edit-icon:hover {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+/* Modal overlay for selecting an alternate image */
+.image-selector-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.image-selector {
+  background-color: #ffffff;
+  padding: 1rem;
+  border-radius: var(--radius-large);
+  max-width: 90%;
+  max-height: 80%;
+  overflow-y: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.image-selector img {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: var(--radius-small);
+  box-shadow: var(--shadow-light);
+  cursor: pointer;
+  transition: transform 0.2s;
+  border: 2px solid transparent;
+  box-sizing: border-box;
+}
+
+.image-selector img:hover {
+  transform: scale(1.05);
+}
+
+
+.module .swatches {
+  margin-left: auto; /* pushes swatches to right */
+  display: flex;
+  gap: 0.4rem;
+}
+
+.module .swatches span {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid #e5e7eb;
+}
+
+/* Editable fields: highlight on focus */
+.module [contenteditable="true"] {
+  border-bottom: 1px dotted transparent;
+  cursor: text;
+  transition: border-color 0.2s;
+}
+
+.module [contenteditable="true"]:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+/* Utility classes for interactive image selection */
+.selectable {
+  cursor: pointer;
+}
+
+.image-selector img.selected {
+  border-color: var(--color-primary);
+}
+
+.image-selector button {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: var(--radius-small);
+  cursor: pointer;
+}
+
+.hero-image-wrapper {
+  position: relative;
+}
