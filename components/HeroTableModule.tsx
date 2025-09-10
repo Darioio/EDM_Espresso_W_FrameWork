@@ -17,8 +17,6 @@ interface HeroTableModuleProps {
    *  component to adjust margins/padding to more closely match the
    *  selected template. Unknown ids fall back to the default style. */
   templateId?: string;
-  /** Optional bottom padding applied to the inner table */
-  paddingBottom?: number;
   /** Callback when the module is interacted with */
   onActivate?: () => void;
 }
@@ -41,7 +39,6 @@ const HeroTableModule: React.FC<HeroTableModuleProps> = ({
   heroImages,
   updateHero,
   templateId,
-  paddingBottom,
   onActivate
 }) => {
   // Local state controlling the visibility of the image selector
@@ -72,6 +69,7 @@ const HeroTableModule: React.FC<HeroTableModuleProps> = ({
     (() => {
       const outerPadding = templateId === 'hero-margins' ? '0 25px' : '0';
       return (
+        <>
         <table
           role="presentation"
           width="100%"
@@ -79,12 +77,12 @@ const HeroTableModule: React.FC<HeroTableModuleProps> = ({
           cellSpacing={0}
           border={0}
           align="center"
-          style={{ margin: '0', padding: 0, background: '#F7F7F7' }}
+        style={{ margin: '0', padding: 0 }}
           onClick={onActivate}
         >
           <tbody>
             <tr>
-              <td align="center" style={{ margin: 0, padding: 0, background: '#F7F7F7' }}>
+              <td align="center" style={{ margin: 0, padding: 0 }}>
                 {/* Wrapper */}
                 <table
                   role="presentation"
@@ -92,7 +90,7 @@ const HeroTableModule: React.FC<HeroTableModuleProps> = ({
                   cellPadding={0}
                   cellSpacing={0}
                   border={0}
-                  style={{ maxWidth: '600px', margin: '0 auto', padding: outerPadding, background: '#FFFFFF', paddingBottom: paddingBottom ? `${paddingBottom}px` : undefined }}
+                  style={{ maxWidth: '600px', margin: '0 auto', padding: outerPadding, background: '#FFFFFF' }}
                 >
                   <tbody>
                     <tr>
@@ -101,6 +99,7 @@ const HeroTableModule: React.FC<HeroTableModuleProps> = ({
                            Instead, clicking the image or edit icon opens the selector. */}
                         <div
                           className={`hero-image-wrapper${availableImages.length > 0 ? ' selectable' : ''}`}
+                          style={{ position: 'relative', cursor: availableImages.length > 0 ? 'pointer' : 'default' }}
                           onClick={() => {
                             if (availableImages.length > 0) {
                               openSelector();
@@ -114,14 +113,27 @@ const HeroTableModule: React.FC<HeroTableModuleProps> = ({
                           />
                           {heroImages && heroImages.length > 0 && (
                             <div
-                              className="edit-icon"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onActivate?.();
                                 openSelector();
                               }}
+                              style={{
+                                position: 'absolute',
+                                bottom: 8,
+                                right: 8,
+                                backgroundColor: 'rgba(0,0,0,0.5)',
+                                color: '#ffffff',
+                                borderRadius: '50%',
+                                padding: 4,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer'
+                              }}
+                              aria-label="Select hero image"
+                              title="Select hero image"
                             >
-                              {/* Pencil SVG similar to product modules */}
                               <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                                 <path d="M14.69 3.1l6.2 6.2c.27.27.27.7 0 .97l-8.2 8.2c-.17.17-.39.26-.62.26H6.5c-.55 0-1-.45-1-1v-5.57c0-.23.09-.45.26-.62l8.2-8.2c.27-.27.7-.27.97 0zM5 20h14v2H5v-2z" />
                               </svg>
@@ -134,31 +146,72 @@ const HeroTableModule: React.FC<HeroTableModuleProps> = ({
                 </table>
               </td>
             </tr>
-            {/* Modal overlay for hero image selection. Constrained to right panel via inline left/width adjustments. */}
-            {showSelector && availableImages.length > 0 && (
-              <div className="image-selector-overlay" onClick={closeSelector}>
-                <div className="image-selector" onClick={(e) => e.stopPropagation()}>
-                  {availableImages.map((img, i) => {
-                    const isSelected = img === heroImage;
-                    return (
-                      <img
-                        key={i}
-                        src={img}
-                        alt=""
-                        className={isSelected ? 'selected' : undefined}
-                        onClick={() => handleSelect(img)}
-                      />
-                    );
-                  })}
-                  <button onClick={closeSelector}>Close</button>
-                </div>
-              </div>
-            )}
           </tbody>
         </table>
+        {/* Modal overlay for hero image selection. Centered within the right panel */}
+        {showSelector && availableImages.length > 0 && (() => {
+          const container = (document.querySelector('[data-preview-container="true"]') as HTMLElement) || null;
+          const rect = container?.getBoundingClientRect();
+          const overlayStyle: React.CSSProperties = rect ? {
+            position: 'fixed', left: rect.left, top: 0, width: rect.width, height: '100vh',
+            backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+          } : { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 };
+          return (
+          <div onClick={closeSelector} style={overlayStyle}>
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                backgroundColor: '#ffffff',
+                padding: '1rem',
+                borderRadius: 8,
+                maxWidth: '90%',
+                maxHeight: '80%',
+                overflowY: 'auto',
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 'var(--gap-2)',
+                justifyContent: 'center',
+              }}
+            >
+              {availableImages.map((img, i) => {
+                const isSelected = img === heroImage;
+                return (
+                  <img
+                    key={i}
+                    src={img}
+                    alt=""
+                    style={{
+                      border: isSelected ? '2px solid #d19aa0' : '2px solid transparent',
+                      boxSizing: 'border-box',
+                      width: 120,
+                      height: 120,
+                      objectFit: 'cover',
+                      borderRadius: 6,
+                    }}
+                    onClick={() => handleSelect(img)}
+                  />
+                );
+              })}
+              <button
+                onClick={closeSelector}
+                style={{
+                  marginTop: '0.5rem',
+                  padding: '0.5rem 1rem',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer'
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+          );
+        })()}
+        </>
       );
     })()
   );
 };
 
-export default HeroTableModule;
+export default React.memo(HeroTableModule);

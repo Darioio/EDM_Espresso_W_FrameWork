@@ -32,9 +32,9 @@ export const defaultTemplates: Template[] = [
     // placeholder, and right-aligned colour swatches. The CTA uses
     // the accent colour defined in globals.css.
     html: `<!-- === Start: Product Feature Module (Image Left / Copy Right) === -->
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0;padding:0;background:#F7F7F7;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0;padding:0;">
   <tr>
-    <td align="center" style="margin:0;padding:0;background:#F7F7F7;">
+    <td align="center" style="margin:0;padding:0;">
       <!-- Wrapper -->
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;margin:0 auto;background:#FFFFFF;">
         <tr>
@@ -126,9 +126,9 @@ export const defaultTemplates: Template[] = [
     // placeholder {{priceHtml}} should contain the formatted price with
     // any original price included.
     html: `<!-- === Start: Product Feature Module (Copy Left / Image Right) === -->
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0;padding:0;background:#F7F7F7;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0;padding:0;">
   <tr>
-    <td align="center" style="margin:0;padding:0;background:#F7F7F7;">
+    <td align="center" style="margin:0;padding:0;">
       <!-- Wrapper -->
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;margin:0 auto;background:#FFFFFF;">
         <tr>

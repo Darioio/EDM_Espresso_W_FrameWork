@@ -1,5 +1,6 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import { ProductData } from './types';
 
 /**
  * Shape of the information we care about from a product page.
@@ -7,70 +8,7 @@ import * as cheerio from 'cheerio';
  * These fields mirror the placeholders used in templates. Some
  * fields are optional because not every page will expose them.
  */
-export interface ProductData {
-  /**
-   * Original URL of the product. When the module is rendered this
-   * should be used for the CTA link.
-   */
-  url: string;
-  /**
-   * Optional short prefix or collection name for a product. Some
-   * sites surface this above the main product name. If missing the
-   * value will be an empty string.
-   */
-  pretitle: string;
-  /**
-   * Main product name.
-   */
-  title: string;
-  /**
-   * Price string, for example “$199.95 AUD”. Empty when not found.
-   */
-  price: string;
-
-  /**
-   * Original (compare‑at) price before any discount. Optional because
-   * many pages do not show a strike‑through price. When present the
-   * priceHtml helper in the front end will render this value first
-   * followed by the sale price. The value should not include a
-   * currency symbol.
-   */
-  originalPrice?: string;
-  /**
-   * Short description of the product.
-   */
-  description: string;
-  /**
-   * Primary image for the product. Should be a fully qualified URL.
-   */
-  image: string;
-
-  /**
-   * List of all image URLs found for the product. The first entry
-   * should match the primary image. This is used to allow users to
-   * swap images in the preview. Some pages provide multiple angles
-   * or colour variants. Only absolute URLs are included.
-   */
-  images?: string[];
-  /**
-   * Optional array of colour swatch hex codes. Left empty when none
-   * could be detected.
-   */
-  colors: string[];
-  /**
-   * CTA URL; typically identical to the product URL but may be
-   * overridden by the calling code if needed.
-   */
-  cta: string;
-
-  /**
-   * Label for the call‑to‑action button. Defaults to "SHOP NOW" if
-   * not provided. Allows users to customise the button wording in
-   * the preview and have those changes reflected in the generated
-   * HTML. Optional because some parsing scenarios may not set it.
-   */
-  ctaLabel?: string;
-}
+// ProductData type moved to lib/types.ts
 
 /**
  * Attempt to parse structured JSON-LD data from the page. Many
@@ -147,9 +85,10 @@ export async function parseProduct(url: string): Promise<ProductData> {
       price: '',
       description: '',
       image: '',
-      colors: [],
-      cta: url
-    };
+      images: undefined,
+      cta: url,
+      ctaLabel: 'SHOP NOW'
+    } as ProductData;
   }
 
   const $ = cheerio.load(html);
@@ -166,7 +105,6 @@ export async function parseProduct(url: string): Promise<ProductData> {
     originalPrice: undefined,
     description: '',
     image: '',
-    colors: [],
     images: undefined,
     cta: url
     ,
@@ -189,6 +127,24 @@ export async function parseProduct(url: string): Promise<ProductData> {
     clean(getMeta($, 'og:description')) ||
     clean(getMeta($, 'twitter:description')) ||
     clean(getMeta($, 'description'));
+
+  // Extract specific description sources from .product__description
+  try {
+    const descRoot = $('.product__description').first();
+    if (descRoot && descRoot.length) {
+      const p = descRoot.find('p').first();
+      if (p && p.length) {
+        product.descriptionP = clean(p.text());
+      }
+      const ul = descRoot.find('ul').first();
+      if (ul && ul.length) {
+        // Preserve UL structure as HTML for email preview/template
+        product.descriptionUl = $.html(ul);
+      }
+    }
+  } catch (e) {
+    // ignore extraction errors
+  }
 
   // Image
   const ldImage: string | undefined = Array.isArray(ld.image)
@@ -295,30 +251,7 @@ export async function parseProduct(url: string): Promise<ProductData> {
     }
   }
 
-  // Colours: attempt to find colour swatch elements. Many ecommerce
-  // platforms use inline styles or background colours to define swatch
-  // elements. We look for any elements with a background colour style
-  // and extract the hex code. The colours are collected in the order
-  // they appear in the DOM and deduplicated while preserving that order.
-  const coloursFound: string[] = [];
-  $('[style]').each((_, el) => {
-    const style = $(el).attr('style');
-    if (!style) return;
-    const match = /background(?:-color)?\s*:\s*([^;]+);?/i.exec(style);
-    if (!match) return;
-    const colour = match[1].trim();
-    // Only accept simple hex codes (3 or 6 hex digits). Ignore other
-    // formats such as rgb() so the preview displays consistent swatches.
-    if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})/.test(colour)) {
-      // Skip very light colours (white/off-white backgrounds) as these
-      // are commonly used for container backgrounds rather than swatches.
-      if (/^(#?fff(?:fff)?|#?f7f7f7)$/i.test(colour)) return;
-      if (!coloursFound.includes(colour)) {
-        coloursFound.push(colour);
-      }
-    }
-  });
-  product.colors = coloursFound;
+  // Colour capture removed per refactor; no swatch detection
 
   // Images: collect additional image URLs beyond the primary image. We
   // start with the primary image if it exists. Then search for image

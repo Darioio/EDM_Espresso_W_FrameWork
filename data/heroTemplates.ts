@@ -29,9 +29,9 @@ export const defaultHeroTemplates: HeroTemplate[] = [
     id: 'hero-default',
     name: 'Default Hero',
     html: `<!-- === Start: Hero Section === -->
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0;padding:0;background:#F7F7F7;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0;padding:0;">
   <tr>
-    <td align="center" style="margin:0;padding:0;background:#F7F7F7;">
+    <td align="center" style="margin:0;padding:0;">
       <!-- Wrapper -->
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;margin:0 auto;background:#FFFFFF;">
         <tr>
@@ -62,9 +62,9 @@ export const defaultHeroTemplates: HeroTemplate[] = [
     id: 'hero-margins',
     name: 'Hero with Margins',
     html: `<!-- === Start: Hero Section === -->
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0;padding:0px;background:#F7F7F7;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0;padding:0px;">
   <tr>
-    <td align="center" style="margin:0;padding:0;background:#F7F7F7;">
+    <td align="center" style="margin:0;padding:0;">
       <!-- Wrapper -->
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;margin:0 auto;background:#FFFFFF;padding:0px 25px 0px 25px;">
         <tr>

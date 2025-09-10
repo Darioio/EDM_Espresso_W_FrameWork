@@ -1,39 +1,6 @@
 import React from 'react';
 import { uniqueImages } from '../lib/imageUtils';
-
-export interface ProductData {
-  url: string;
-  /**
-   * Optional short prefix or collection name for a product. The pretitle
-   * field is no longer used in the default templates, but is retained
-   * here for backward compatibility. New templates should omit this.
-   */
-  pretitle: string;
-  /** Main product name */
-  title: string;
-  /** Sale price as displayed on the product page */
-  price: string;
-  /** Original (compare-at) price before discount, if available */
-  originalPrice?: string;
-  /** Short description of the product */
-  description: string;
-  /** URL of the currently selected product image */
-  image: string;
-  /** All images found on the product page. Used to select alternatives. */
-  images?: string[];
-  /** Colour swatch hex codes extracted from the page */
-  colors: string[];
-  /** CTA URL; typically identical to the product URL */
-  cta: string;
-
-  /**
-   * Label text for the call-to-action button. Defaults to "SHOP NOW" if
-   * none is provided. This allows users to customise the button
-   * wording in the preview and have those changes reflected in the
-   * generated HTML.
-   */
-  ctaLabel?: string;
-}
+import { ProductData } from '../lib/types';
 
 interface EditableModuleProps {
   product: ProductData;
@@ -152,13 +119,6 @@ const EditableModule: React.FC<EditableModuleProps> = ({
           >
             SHOP NOW
           </a>
-          <div className="swatches">
-            {product.colors && product.colors.length > 0
-              ? product.colors.map((clr, i) => (
-                  <span key={i} style={{ backgroundColor: clr }}></span>
-                ))
-              : null}
-          </div>
         </div>
       </div>
       {/* Image selector modal */}

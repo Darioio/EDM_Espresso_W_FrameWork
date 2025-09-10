@@ -58,7 +58,6 @@ export default async function handler(
         'description',
         'image',
         'originalPrice',
-        'colors',
         'images'
       ];
       const hasInfo = meaningfulKeys.some((key) => {

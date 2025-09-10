@@ -1,5 +1,29 @@
 import React, { useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import Head from 'next/head';
+import AppLayout from '../components/AppLayout';
+import Skeleton from '@mui/material/Skeleton';
+import Snackbar from '@mui/material/Snackbar';
+// MUI components for Brand Customisation panel
+import Drawer from '@mui/material/Drawer';
+import Typography from '@mui/material/Typography';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import TextField from '@mui/material/TextField';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Divider from '@mui/material/Divider';
+// Padding toggles removed
+import Paper from '@mui/material/Paper';
+import CloseIcon from '@mui/icons-material/Close';
+import { MuiColorInput } from 'mui-color-input';
+import InputAdornment from '@mui/material/InputAdornment';
+// Removed padding controls
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+// import Backdrop from '@mui/material/Backdrop';
 import {
   defaultTemplates as defaultBodyTemplates,
   Template as BodyTemplate,
@@ -21,7 +45,7 @@ import {
   defaultBannerTemplates,
   BannerTemplate
 } from '../data/bannerTemplates';
-import { ProductData } from '../components/EditableModule';
+import { ProductData } from '../lib/types';
 // Import interactive modules for preview. ProductTableModule renders
 // each product module with inline editing and image selection. The
 // HeroTableModule renders the hero section with image selection.
@@ -31,12 +55,19 @@ import HeroTableModule from '../components/HeroTableModule';
 // rendering via Option A the preview uses the compiled HTML directly so we
 // no longer import or use ProductTableModule here.
 
-// Import FontAwesome icons for various actions. Icons are imported
-// individually to keep bundle size down. We use code, eye, edit,
-// plus, copy, save and times icons. The FontAwesomeIcon component
-// renders the SVGs inline.
-import { faCopy, faCode, faEye, faPlus, faTimes, faSave, faPen, faMinus, faCog, faTrash, faChevronDown, faChevronUp, faGripVertical } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+// MUI Icons
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import CodeIcon from '@mui/icons-material/Code';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import AddIcon from '@mui/icons-material/Add';
+import CloseIcon2 from '@mui/icons-material/Close';
+import SaveIcon from '@mui/icons-material/Save';
+import EditIcon from '@mui/icons-material/Edit';
+import SettingsIcon from '@mui/icons-material/Settings';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import {
   DndContext,
   closestCenter,
@@ -82,57 +113,7 @@ const alternateMap: Record<string, string> = {
   'product-copy-left-image-right': 'product-image-left-copy-right'
 };
 
-/**
- * Inject a padding-bottom style into the first or last table with
- * a max-width of 600px. Email modules share this structure and the
- * padding should live on the table rather than an external wrapper.
- */
-const addPaddingToTable = (html: string, padding: number, last = false) => {
-  const marker = 'max-width:600px';
-  const idx = last ? html.lastIndexOf(marker) : html.indexOf(marker);
-  if (idx === -1) return html;
-  // Find the full style attribute containing the marker so we can
-  // read any existing padding values. We'll then append our padding
-  // to whatever bottom padding already exists rather than relying on
-  // an external wrapper element.
-  const styleStart = html.lastIndexOf('style="', idx);
-  const styleEnd = html.indexOf('"', idx);
-  if (styleStart === -1 || styleEnd === -1) return html;
-
-  let styleStr = html.slice(styleStart + 7, styleEnd);
-
-  // Determine existing bottom padding from either a padding-bottom
-  // declaration or the shorthand padding property.
-  let existing = 0;
-  const bottomMatch = styleStr.match(/padding-bottom:\s*(\d+)px/);
-  if (bottomMatch) {
-    existing = parseInt(bottomMatch[1], 10);
-    styleStr = styleStr.replace(/padding-bottom:\s*\d+px;?/, '');
-  } else {
-    const paddingMatch = styleStr.match(/padding:\s*([^;]+);?/);
-    if (paddingMatch) {
-      const parts = paddingMatch[1].trim().split(/\s+/);
-      if (parts.length === 1 || parts.length === 2) {
-        existing = parseInt(parts[0], 10);
-      } else if (parts.length === 3) {
-        existing = parseInt(parts[2], 10);
-      } else if (parts.length === 4) {
-        existing = parseInt(parts[2], 10);
-      }
-    }
-  }
-
-  // Ensure the style string ends with a semicolon before appending.
-  styleStr = styleStr.trim();
-  if (styleStr && !styleStr.endsWith(';')) styleStr += ';';
-  styleStr += `padding-bottom:${existing + padding}px`;
-
-  return (
-    html.slice(0, styleStart + 7) +
-    styleStr +
-    html.slice(styleEnd)
-  );
-};
+// Bottom padding functionality removed
 
 /**
  * Each body section contains its own list of product URLs, parsed
@@ -145,18 +126,12 @@ const addPaddingToTable = (html: string, padding: number, last = false) => {
 interface BodySection {
   id: number;
   name: string;
-  urls: string[];
+  urls: string[]; // committed URLs used for generation
   products: ProductData[];
   selectedBodyId: string;
   loading: boolean;
-  /** Whether bottom padding should be applied after this section */
-  paddingEnabled: boolean;
-  /** Bottom padding value in pixels */
-  padding: number;
-  /** Background colour for CTAs within this section */
-  ctaBg: string;
-  /** Temporary preview colour while adjusting the picker */
-  ctaBgPreview?: string;
+  /** Source of description to use for products in this section */
+  descriptionSource?: 'metadata' | 'p' | 'ul';
 }
 
 export default function Home() {
@@ -213,11 +188,22 @@ export default function Home() {
       products: [],
       selectedBodyId: defaultBodyTemplates[0].id,
       loading: false,
-      paddingEnabled: false,
-      padding: 25,
-      ctaBg: '#d19aa0'
+      descriptionSource: 'metadata'
     }
   ]);
+
+  // Draft URLs per section id; keeps typing local without re-rendering main compose
+  const [draftUrls, setDraftUrls] = useState<Record<number, string[]>>({});
+
+  const getDraftUrls = useCallback(
+    (sectionId: number): string[] => {
+      const existing = draftUrls[sectionId];
+      if (existing) return existing;
+      const section = bodySections.find((s) => s.id === sectionId);
+      return section ? section.urls : [];
+    },
+    [draftUrls, bodySections]
+  );
 
   // Visibility toggles for optional sections
   const [showHeaderSection, setShowHeaderSection] = useState(true);
@@ -287,207 +273,145 @@ export default function Home() {
     const { ['aria-describedby']: _ariaDescribedBy, ...sortableAttributes } = attributes as any;
     const style = { transform: CSS.Transform.toString(transform), transition } as React.CSSProperties;
     return (
-      <div className="accordion-section" ref={setNodeRef} style={style}>
-        <div className="accordion-header" onClick={() => handleAccordionToggle(`body-${section.id}`)}>
-          <button
-            className="icon-button"
+      <div className={`accordion-section${openSection === `body-${section.id}` ? ' open' : ''}`} ref={setNodeRef} style={style}>
+        <div className={`accordion-header${openSection === `body-${section.id}` ? ' open' : ''}`} onClick={() => handleAccordionToggle(`body-${section.id}`)}>
+          <IconButton
+            size="medium"
             {...sortableAttributes}
             {...listeners}
             onClick={(e) => e.stopPropagation()}
             title="Reorder section"
           >
-            <FontAwesomeIcon icon={faGripVertical} />
-          </button>
+            <DragIndicatorIcon fontSize="medium" />
+          </IconButton>
           <span>{section.name}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: 'auto' }}>
-            <button
-              className="icon-button"
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--gap-2)', marginLeft: 'auto' }}>
+            <IconButton
+              size="medium"
               onClick={(e) => {
                 e.stopPropagation();
                 removeBodySection(section.id);
               }}
               title="Remove section"
             >
-              <FontAwesomeIcon icon={faTrash} />
-            </button>
-            <button
-              className="icon-button"
+              <DeleteIcon fontSize="medium" />
+            </IconButton>
+            <IconButton
+              size="medium"
               onClick={(e) => {
                 e.stopPropagation();
                 handleAccordionToggle(`body-${section.id}`);
               }}
               title={openSection === `body-${section.id}` ? 'Collapse section' : 'Expand section'}
             >
-              <FontAwesomeIcon icon={openSection === `body-${section.id}` ? faMinus : faPlus} />
-            </button>
+              {openSection === `body-${section.id}` ? (
+                <ExpandLessIcon fontSize="medium" />
+              ) : (
+                <ExpandMoreIcon fontSize="medium" />
+              )}
+            </IconButton>
           </div>
         </div>
         {openSection === `body-${section.id}` && (
           <div className="accordion-content">
-            <div>
-              <h3 style={{ fontSize: '1rem', margin: '0 0 0.5rem 0' }}>Product URLs</h3>
-              {section.urls.map((url, index) => (
-                <div className="url-row" key={index}>
-                  <input
-                    id={`url-${section.id}-${index}`}
-                    type="url"
-                    placeholder="https://example.com/product"
-                    value={url}
-                    onChange={(e) => handleUrlChange(section.id, index, e.target.value)}
-                    onPaste={(e) => {
-                      const pasted = e.clipboardData.getData('text');
-                      e.preventDefault();
-                      const cleaned = sanitizeUrl(pasted);
-                      handleUrlChange(section.id, index, cleaned);
-                      if (cleaned.trim() && index === section.urls.length - 1) {
-                        addUrlField(section.id, section.urls.length);
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (
-                        e.key === 'Enter' &&
-                        e.currentTarget.value.trim() &&
-                        index === section.urls.length - 1
-                      ) {
-                        e.preventDefault();
-                        addUrlField(section.id, section.urls.length);
-                      }
-                    }}
-                    onBlur={(e) => {
-                      const cleaned = sanitizeUrl(e.currentTarget.value);
-                      handleUrlChange(section.id, index, cleaned);
-                      if (cleaned.trim() && index === section.urls.length - 1) {
-                        addUrlField(section.id);
-                      }
-                    }}
-                  />
-                  {section.urls.length > 1 && (
-                    <button className="icon-button" onClick={() => removeUrlField(section.id, index)} title="Remove URL">
-                      <FontAwesomeIcon icon={faTimes} />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-            <h3 style={{ fontSize: '1rem', margin: '30px 0px 0.5rem' }}>Template</h3>
-            <div className="template-row">
-              <select
-                className="template-select"
-                value={section.selectedBodyId}
-                onChange={(e) => setSectionTemplate(section.id, e.target.value)}
-              >
-                {bodyTemplates.map((tpl) => (
-                  <option key={tpl.id} value={tpl.id}>{tpl.name}</option>
-                ))}
-              </select>
-              <button className="icon-button" onClick={() => setBodyEditMode((v) => !v)} title={bodyEditMode ? 'Close editor' : 'Edit template'}>
-                <FontAwesomeIcon icon={faPen} />
-              </button>
-              <button className="icon-button" onClick={() => setShowNewBody((v) => !v)} title={showNewBody ? 'Cancel new template' : 'Add new template'}>
-                <FontAwesomeIcon icon={faPlus} />
-              </button>
+            {/* Move Template + Description Source controls above URLs */}
+            <div className="template-row" style={{ display: 'flex', gap: 'var(--gap-2)', alignItems: 'center' }}>
+              <FormControl fullWidth variant="outlined">
+                <InputLabel id={`body-template-${section.id}`}>Template</InputLabel>
+                <Select
+                  labelId={`body-template-${section.id}`}
+                  id={`body-template-select-${section.id}`}
+                  label="Template"
+                  value={section.selectedBodyId}
+                  onChange={(e) => setSectionTemplate(section.id, e.target.value as string)}
+                >
+                  {bodyTemplates.map((tpl) => (
+                    <MenuItem key={tpl.id} value={tpl.id}>{tpl.name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <IconButton onClick={() => setBodyEditMode((v) => !v)} title={bodyEditMode ? 'Close editor' : 'Edit template'}>
+                <EditIcon fontSize="medium" />
+              </IconButton>
+              <IconButton onClick={() => setShowNewBody((v) => !v)} title={showNewBody ? 'Cancel new template' : 'Add new template'}>
+                <AddIcon fontSize="medium" />
+              </IconButton>
             </div>
             {bodyEditMode && (
               <div>
-                <textarea value={draftBodyHtml} onChange={(e) => setDraftBodyHtml(e.target.value)} rows={8} style={{ fontFamily: 'monospace', width: '100%' }} />
-                <div className="new-template-actions">
-                  <button className="icon-button" onClick={() => setBodyEditMode(false)} title="Cancel edit">
-                    <FontAwesomeIcon icon={faTimes} />
-                  </button>
-                  <button className="icon-button" onClick={() => { saveBodyEdits(); setBodyEditMode(false); }} title="Save edits">
-                    <FontAwesomeIcon icon={faSave} />
-                  </button>
+                <TextField id={`body-draft-html-${section.id}`} label="Template HTML" value={draftBodyHtml} onChange={(e) => setDraftBodyHtml(e.target.value)} rows={8} fullWidth multiline sx={{ fontFamily: 'monospace' }} />
+                <div className="new-template-actions" style={{ display: 'flex', gap: 'var(--gap-2)', marginTop: '0.5rem' }}>
+                  <IconButton onClick={() => setBodyEditMode(false)} title="Cancel edit">
+                    <CloseIcon2 fontSize="medium" />
+                  </IconButton>
+                  <IconButton onClick={() => { saveBodyEdits(); setBodyEditMode(false); }} title="Save edits">
+                    <SaveIcon fontSize="medium" />
+                  </IconButton>
                 </div>
               </div>
             )}
             {showNewBody && (
               <div className="new-template-form">
-                <input type="text" placeholder="Template name" value={newBodyName} onChange={(e) => setNewBodyName(e.target.value)} />
-                <textarea placeholder="HTML with {{placeholders}}" value={newBodyHtml} onChange={(e) => setNewBodyHtml(e.target.value)} rows={6} style={{ fontFamily: 'monospace', width: '100%' }} />
-                <div className="new-template-actions">
-                  <button className="icon-button" onClick={() => { setShowNewBody(false); setNewBodyName(''); setNewBodyHtml(''); }} title="Cancel new template">
-                    <FontAwesomeIcon icon={faTimes} />
-                  </button>
-                  <button className="icon-button" onClick={() => { addNewBodyTemplate(); setShowNewBody(false); }} title="Save new template">
-                    <FontAwesomeIcon icon={faSave} />
-                  </button>
+                <TextField id={`body-new-name-${section.id}`} label="Template name" type="text" value={newBodyName} onChange={(e) => setNewBodyName(e.target.value)} fullWidth sx={{ mb: 1 }} />
+                <TextField id={`body-new-html-${section.id}`} label="Template HTML" value={newBodyHtml} onChange={(e) => setNewBodyHtml(e.target.value)} rows={6} fullWidth multiline sx={{ fontFamily: 'monospace' }} />
+                <div className="new-template-actions" style={{ display: 'flex', gap: 'var(--gap-2)', marginTop: '0.5rem' }}>
+                  <IconButton onClick={() => { setShowNewBody(false); setNewBodyName(''); setNewBodyHtml(''); }} title="Cancel new template">
+                    <CloseIcon2 fontSize="medium" />
+                  </IconButton>
+                  <IconButton onClick={() => { addNewBodyTemplate(); setShowNewBody(false); }} title="Save new template">
+                    <SaveIcon fontSize="medium" />
+                  </IconButton>
                 </div>
               </div>
             )}
-            <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <button
-                onClick={() => generateSection(section.id)}
-                disabled={section.loading}
-                style={{ fontSize: '1rem' }}
-              >
+            <div>
+              <Typography variant="subtitle1" sx={{ fontSize: '1rem', mb: 1, mt: 1 }}>Product URLs</Typography>
+              {getDraftUrls(section.id).map((url, index) => (
+                <Box key={index} sx={{ mb: 2 }}>
+                  <TextField
+                    id={`url-${section.id}-${index}`}
+                    type="url"
+                    label={`Product URL ${index + 1}`}
+                    defaultValue={url}
+                    fullWidth
+                    onBlur={(e) => {
+                      const cleaned = sanitizeUrl(e.currentTarget.value);
+                      handleUrlChange(section.id, index, cleaned);
+                    }}
+                    InputProps={{
+                      endAdornment: getDraftUrls(section.id).length > 1 ? (
+                        <InputAdornment position="end">
+                          <IconButton onClick={() => removeUrlField(section.id, index)} title="Remove URL" edge="end">
+                            <CloseIcon2 fontSize="medium" />
+                          </IconButton>
+                        </InputAdornment>
+                      ) : null,
+                    }}
+                    inputProps={{
+                      onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const curr = (e.currentTarget as HTMLInputElement);
+                          const value = curr.value.trim();
+                          const listLen = getDraftUrls(section.id).length;
+                          if (value && index === listLen - 1) {
+                            addUrlField(section.id, index + 1);
+                          }
+                          curr.blur();
+                        }
+                      }
+                    }}
+                  />
+                </Box>
+              ))}
+            </div>
+            <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: 'var(--gap-2)' }}>
+              <Button onClick={() => generateSection(section.id)} disabled={section.loading}>
                 {section.loading ? 'Generating…' : 'Update'}
-              </button>
+              </Button>
             </div>
-            <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span>Enable bottom padding</span>
-                <label className="toggle-switch">
-                  <input
-                    type="checkbox"
-                    checked={section.paddingEnabled}
-                    onChange={(e) =>
-                      setBodySections((prev) =>
-                        prev.map((s) =>
-                          s.id === section.id ? { ...s, paddingEnabled: e.target.checked } : s
-                        )
-                      )
-                    }
-                  />
-                  <span className="slider" />
-                </label>
-              </div>
-              {section.paddingEnabled && (
-                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={section.padding}
-                    onChange={(e) =>
-                      setBodySections((prev) =>
-                        prev.map((s) =>
-                          s.id === section.id ? { ...s, padding: Number(e.target.value) } : s
-                        )
-                      )
-                    }
-                  />
-                  <span>{section.padding}px</span>
-                </div>
-              )}
-            </div>
-            {section.products.some((p) => p.cta) && (
-              <div
-                style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-              >
-                <label>CTA background</label>
-                <input
-                  type="color"
-                  value={section.ctaBgPreview ?? section.ctaBg}
-                  onInput={(e) =>
-                    setBodySections((prev) =>
-                      prev.map((s) =>
-                        s.id === section.id ? { ...s, ctaBgPreview: e.currentTarget.value } : s
-                      )
-                    )
-                  }
-                  onChange={(e) =>
-                    setBodySections((prev) =>
-                      prev.map((s) =>
-                        s.id === section.id
-                          ? { ...s, ctaBg: e.target.value, ctaBgPreview: undefined }
-                          : s
-                      )
-                    )
-                  }
-                  style={{ width: '2rem', height: '2rem', padding: 0, border: 'none' }}
-                />
-              </div>
-            )}
+            {/* Bottom padding controls removed */}
+            {/* CTA background customization removed */}
           </div>
         )}
       </div>
@@ -499,39 +423,39 @@ export default function Home() {
     const { ['aria-describedby']: _ariaDescribedBy, ...sortableAttributes } = attributes as any;
     const style = { transform: CSS.Transform.toString(transform), transition } as React.CSSProperties;
     return (
-      <div className="accordion-section" ref={setNodeRef} style={style}>
-        <div className="accordion-header" onClick={() => handleAccordionToggle('hero')}>
-          <button
-            className="icon-button"
+      <div className={`accordion-section${openSection === 'hero' ? ' open' : ''}`} ref={setNodeRef} style={style}>
+        <div className={`accordion-header${openSection === 'hero' ? ' open' : ''}`} onClick={() => handleAccordionToggle('hero')}>
+          <IconButton
+            size="medium"
             {...sortableAttributes}
             {...listeners}
             onClick={(e) => e.stopPropagation()}
             title="Reorder section"
           >
-            <FontAwesomeIcon icon={faGripVertical} />
-          </button>
+            <DragIndicatorIcon fontSize="medium" />
+          </IconButton>
           <span>Hero</span>
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <button
-              className="icon-button"
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--gap-2)' }}>
+            <IconButton
+              size="medium"
               onClick={(e) => {
                 e.stopPropagation();
                 removeHeroSection();
               }}
               title="Remove section"
             >
-              <FontAwesomeIcon icon={faTrash} />
-            </button>
-            <button
-              className="icon-button"
+              <DeleteIcon fontSize="medium" />
+            </IconButton>
+            <IconButton
+              size="medium"
               onClick={(e) => {
                 e.stopPropagation();
                 handleAccordionToggle('hero');
               }}
               title={openSection === 'hero' ? 'Collapse section' : 'Expand section'}
             >
-              <FontAwesomeIcon icon={openSection === 'hero' ? faMinus : faPlus} />
-            </button>
+              {openSection === 'hero' ? <ExpandLessIcon fontSize="medium" /> : <ExpandMoreIcon fontSize="medium" />}
+            </IconButton>
           </div>
         </div>
         {openSection === 'hero' && (
@@ -543,64 +467,82 @@ export default function Home() {
             ) : (
               <p>No hero image selected.</p>
             )}
-            <h3 style={{ fontSize: '1rem', margin: '30px 0px 0.5rem' }}>Template</h3>
             <div className="template-row">
-              <select className="template-select" value={selectedHeroId} onChange={(e) => setSelectedHeroId(e.target.value)}>
-                {heroTemplates.map((tpl) => (
-                  <option key={tpl.id} value={tpl.id}>
-                    {tpl.name}
-                  </option>
-                ))}
-              </select>
-              <button className="icon-button" onClick={() => setHeroEditMode((v) => !v)} title={heroEditMode ? 'Close editor' : 'Edit template'}>
-                <FontAwesomeIcon icon={faPen} />
-              </button>
-              <button className="icon-button" onClick={() => setShowNewHero((v) => !v)} title={showNewHero ? 'Cancel new template' : 'Add new template'}>
-                <FontAwesomeIcon icon={faPlus} />
-              </button>
+              <FormControl fullWidth variant="outlined">
+                <InputLabel id="hero-template-label">Template</InputLabel>
+                <Select labelId="hero-template-label" id="hero-template-select" label="Template" value={selectedHeroId} onChange={(e) => setSelectedHeroId(e.target.value)}>
+                  {heroTemplates.map((tpl) => (
+                    <MenuItem key={tpl.id} value={tpl.id}>{tpl.name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <IconButton onClick={() => setHeroEditMode((v) => !v)} title={heroEditMode ? 'Close editor' : 'Edit template'}>
+                <EditIcon fontSize="medium" />
+              </IconButton>
+              <IconButton onClick={() => setShowNewHero((v) => !v)} title={showNewHero ? 'Cancel new template' : 'Add new template'}>
+                <AddIcon fontSize="medium" />
+              </IconButton>
             </div>
             {heroEditMode && (
               <div>
-                <textarea value={draftHeroHtml} onChange={(e) => setDraftHeroHtml(e.target.value)} rows={6} style={{ fontFamily: 'monospace', width: '100%' }} />
-                <div className="new-template-actions">
-                  <button className="icon-button" onClick={() => setHeroEditMode(false)} title="Cancel edit">
-                    <FontAwesomeIcon icon={faTimes} />
-                  </button>
-                  <button className="icon-button" onClick={() => { saveHeroEdits(); setHeroEditMode(false); }} title="Save edits">
-                    <FontAwesomeIcon icon={faSave} />
-                  </button>
+                <TextField id="hero-draft-html" label="Template HTML" value={draftHeroHtml} onChange={(e) => setDraftHeroHtml(e.target.value)} rows={6} fullWidth multiline sx={{ fontFamily: 'monospace' }} />
+                <div className="new-template-actions" style={{ display: 'flex', gap: 'var(--gap-2)', marginTop: '0.5rem' }}>
+                  <IconButton onClick={() => setHeroEditMode(false)} title="Cancel edit">
+                    <CloseIcon2 fontSize="medium" />
+                  </IconButton>
+                  <IconButton onClick={() => { saveHeroEdits(); setHeroEditMode(false); }} title="Save edits">
+                    <SaveIcon fontSize="medium" />
+                  </IconButton>
                 </div>
               </div>
             )}
+            <TextField
+              id="hero-href"
+              label="Hero Link URL"
+              defaultValue={heroHref}
+              onBlur={(e) => setHeroHref(sanitizeUrl(e.currentTarget.value))}
+              fullWidth
+              sx={{ mt: 2 }}
+              inputProps={{
+                onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    (e.currentTarget as HTMLInputElement).blur();
+                  }
+                }
+              }}
+            />
+            <TextField
+              id="hero-alt"
+              label="Hero Alt Text"
+              defaultValue={heroAlt}
+              onBlur={(e) => setHeroAlt(e.currentTarget.value)}
+              fullWidth
+              sx={{ mt: 2 }}
+              inputProps={{
+                onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    (e.currentTarget as HTMLInputElement).blur();
+                  }
+                }
+              }}
+            />
             {showNewHero && (
               <div className="new-template-form">
-                <input type="text" placeholder="Template name" value={newHeroName} onChange={(e) => setNewHeroName(e.target.value)} />
-                <textarea placeholder="HTML" value={newHeroHtml} onChange={(e) => setNewHeroHtml(e.target.value)} rows={6} style={{ fontFamily: 'monospace', width: '100%' }} />
-                <div className="new-template-actions">
-                  <button className="icon-button" onClick={() => { setShowNewHero(false); setNewHeroName(''); setNewHeroHtml(''); }} title="Cancel new template">
-                    <FontAwesomeIcon icon={faTimes} />
-                  </button>
-                  <button className="icon-button" onClick={() => { addNewHeroTemplate(); setShowNewHero(false); }} title="Save new template">
-                    <FontAwesomeIcon icon={faSave} />
-                  </button>
+                <TextField id="hero-new-name" label="Template name" type="text" value={newHeroName} onChange={(e) => setNewHeroName(e.target.value)} fullWidth sx={{ mb: 1 }} />
+                <TextField id="hero-new-html" label="Template HTML" value={newHeroHtml} onChange={(e) => setNewHeroHtml(e.target.value)} rows={6} fullWidth multiline sx={{ fontFamily: 'monospace' }} />
+                <div className="new-template-actions" style={{ display: 'flex', gap: 'var(--gap-2)', marginTop: '0.5rem' }}>
+                  <IconButton onClick={() => { setShowNewHero(false); setNewHeroName(''); setNewHeroHtml(''); }} title="Cancel new template">
+                    <CloseIcon2 fontSize="medium" />
+                  </IconButton>
+                  <IconButton onClick={() => { addNewHeroTemplate(); setShowNewHero(false); }} title="Save new template">
+                    <SaveIcon fontSize="medium" />
+                  </IconButton>
                 </div>
               </div>
             )}
-            <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span>Enable bottom padding</span>
-                <label className="toggle-switch">
-                  <input type="checkbox" checked={heroPaddingEnabled} onChange={(e) => setHeroPaddingEnabled(e.target.checked)} />
-                  <span className="slider" />
-                </label>
-              </div>
-              {heroPaddingEnabled && (
-                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <input type="range" min={0} max={100} value={heroPadding} onChange={(e) => setHeroPadding(Number(e.target.value))} />
-                  <span>{heroPadding}px</span>
-                </div>
-              )}
-            </div>
+            {/* Hero bottom padding controls removed */}
           </div>
         )}
       </div>
@@ -612,39 +554,39 @@ export default function Home() {
     const { ['aria-describedby']: _ariaDescribedBy, ...sortableAttributes } = attributes as any;
     const style = { transform: CSS.Transform.toString(transform), transition } as React.CSSProperties;
     return (
-      <div className="accordion-section" ref={setNodeRef} style={style}>
-        <div className="accordion-header" onClick={() => handleAccordionToggle('banner')}>
-          <button
-            className="icon-button"
+      <div className={`accordion-section${openSection === 'banner' ? ' open' : ''}`} ref={setNodeRef} style={style}>
+        <div className={`accordion-header${openSection === 'banner' ? ' open' : ''}`} onClick={() => handleAccordionToggle('banner')}>
+          <IconButton
+            size="medium"
             {...sortableAttributes}
             {...listeners}
             onClick={(e) => e.stopPropagation()}
             title="Reorder section"
           >
-            <FontAwesomeIcon icon={faGripVertical} />
-          </button>
+            <DragIndicatorIcon fontSize="medium" />
+          </IconButton>
           <span>Banner</span>
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <button
-              className="icon-button"
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--gap-2)' }}>
+            <IconButton
+              size="medium"
               onClick={(e) => {
                 e.stopPropagation();
                 removeBannerSection();
               }}
               title="Remove section"
             >
-              <FontAwesomeIcon icon={faTrash} />
-            </button>
-            <button
-              className="icon-button"
+              <DeleteIcon fontSize="medium" />
+            </IconButton>
+            <IconButton
+              size="medium"
               onClick={(e) => {
                 e.stopPropagation();
                 handleAccordionToggle('banner');
               }}
               title={openSection === 'banner' ? 'Collapse section' : 'Expand section'}
             >
-              <FontAwesomeIcon icon={openSection === 'banner' ? faMinus : faPlus} />
-            </button>
+              {openSection === 'banner' ? <ExpandLessIcon fontSize="medium" /> : <ExpandMoreIcon fontSize="medium" />}
+            </IconButton>
           </div>
         </div>
         {openSection === 'banner' && (
@@ -656,64 +598,82 @@ export default function Home() {
             ) : (
               <p>No hero image selected.</p>
             )}
-            <h3 style={{ fontSize: '1rem', margin: '30px 0 0.5rem' }}>Template</h3>
-            <div className="template-row">
-              <select className="template-select" value={selectedBannerId} onChange={(e) => setSelectedBannerId(e.target.value)}>
-                {bannerTemplates.map((tpl) => (
-                  <option key={tpl.id} value={tpl.id}>
-                    {tpl.name}
-                  </option>
-                ))}
-              </select>
-              <button className="icon-button" onClick={() => setBannerEditMode((v) => !v)} title={bannerEditMode ? 'Close editor' : 'Edit template'}>
-                <FontAwesomeIcon icon={faPen} />
-              </button>
-              <button className="icon-button" onClick={() => setShowNewBanner((v) => !v)} title={showNewBanner ? 'Cancel new template' : 'Add new template'}>
-                <FontAwesomeIcon icon={faPlus} />
-              </button>
+              <div className="template-row" style={{ display: 'flex', gap: 'var(--gap-2)', alignItems: 'center' }}>
+              <FormControl fullWidth variant="outlined" >
+                <InputLabel id="banner-template-label">Template</InputLabel>
+                <Select labelId="banner-template-label" id="banner-template-select" label="Template" value={selectedBannerId} onChange={(e) => setSelectedBannerId(e.target.value)}>
+                  {bannerTemplates.map((tpl) => (
+                    <MenuItem key={tpl.id} value={tpl.id}>{tpl.name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <IconButton onClick={() => setBannerEditMode((v) => !v)} title={bannerEditMode ? 'Close editor' : 'Edit template'}>
+                <EditIcon fontSize="medium" />
+              </IconButton>
+              <IconButton onClick={() => setShowNewBanner((v) => !v)} title={showNewBanner ? 'Cancel new template' : 'Add new template'}>
+                <AddIcon fontSize="medium" />
+              </IconButton>
             </div>
             {bannerEditMode && (
               <div>
-                <textarea value={draftBannerHtml} onChange={(e) => setDraftBannerHtml(e.target.value)} rows={8} style={{ fontFamily: 'monospace', width: '100%' }} />
-                <div className="new-template-actions">
-                  <button className="icon-button" onClick={() => setBannerEditMode(false)} title="Cancel edit">
-                    <FontAwesomeIcon icon={faTimes} />
-                  </button>
-                  <button className="icon-button" onClick={() => { saveBannerEdits(); setBannerEditMode(false); }} title="Save edits">
-                    <FontAwesomeIcon icon={faSave} />
-                  </button>
+                <TextField id="banner-draft-html" label="Template HTML" value={draftBannerHtml} onChange={(e) => setDraftBannerHtml(e.target.value)} rows={8} fullWidth multiline sx={{ fontFamily: 'monospace' }} />
+                <div className="new-template-actions" style={{ display: 'flex', gap: 'var(--gap-2)', marginTop: '0.5rem' }}>
+                  <IconButton onClick={() => setBannerEditMode(false)} title="Cancel edit">
+                    <CloseIcon2 fontSize="medium" />
+                  </IconButton>
+                  <IconButton onClick={() => { saveBannerEdits(); setBannerEditMode(false); }} title="Save edits">
+                    <SaveIcon fontSize="medium" />
+                  </IconButton>
                 </div>
               </div>
             )}
             {showNewBanner && (
               <div className="new-template-form">
-                <input type="text" placeholder="Template name" value={newBannerName} onChange={(e) => setNewBannerName(e.target.value)} />
-                <textarea placeholder="HTML" value={newBannerHtml} onChange={(e) => setNewBannerHtml(e.target.value)} rows={6} style={{ fontFamily: 'monospace', width: '100%' }} />
-                <div className="new-template-actions">
-                  <button className="icon-button" onClick={() => { setShowNewBanner(false); setNewBannerName(''); setNewBannerHtml(''); }} title="Cancel new template">
-                    <FontAwesomeIcon icon={faTimes} />
-                  </button>
-                  <button className="icon-button" onClick={() => { addNewBannerTemplate(); setShowNewBanner(false); }} title="Save new template">
-                    <FontAwesomeIcon icon={faSave} />
-                  </button>
+                <TextField id="banner-new-name" label="Template name" type="text" value={newBannerName} onChange={(e) => setNewBannerName(e.target.value)} fullWidth sx={{ mb: 1 }} />
+                <TextField id="banner-new-html" label="Template HTML" value={newBannerHtml} onChange={(e) => setNewBannerHtml(e.target.value)} rows={6} fullWidth multiline sx={{ fontFamily: 'monospace' }} />
+                <div className="new-template-actions" style={{ display: 'flex', gap: 'var(--gap-2)', marginTop: '0.5rem' }}>
+                  <IconButton onClick={() => { setShowNewBanner(false); setNewBannerName(''); setNewBannerHtml(''); }} title="Cancel new template">
+                    <CloseIcon2 fontSize="medium" />
+                  </IconButton>
+                  <IconButton onClick={() => { addNewBannerTemplate(); setShowNewBanner(false); }} title="Save new template">
+                    <SaveIcon fontSize="medium" />
+                  </IconButton>
                 </div>
               </div>
             )}
-            <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span>Enable bottom padding</span>
-                <label className="toggle-switch">
-                  <input type="checkbox" checked={bannerPaddingEnabled} onChange={(e) => setBannerPaddingEnabled(e.target.checked)} />
-                  <span className="slider" />
-                </label>
-              </div>
-              {bannerPaddingEnabled && (
-                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <input type="range" min={0} max={100} value={bannerPadding} onChange={(e) => setBannerPadding(Number(e.target.value))} />
-                  <span>{bannerPadding}px</span>
-                </div>
-              )}
-            </div>
+            <TextField
+              id="banner-href"
+              label="Banner Link URL"
+              defaultValue={bannerHref}
+              onBlur={(e) => setBannerHref(sanitizeUrl(e.currentTarget.value))}
+              fullWidth
+              sx={{ mt: 2 }}
+              inputProps={{
+                onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    (e.currentTarget as HTMLInputElement).blur();
+                  }
+                }
+              }}
+            />
+            <TextField
+              id="banner-alt"
+              label="Banner Alt Text"
+              defaultValue={bannerAlt}
+              onBlur={(e) => setBannerAlt(e.currentTarget.value)}
+              fullWidth
+              sx={{ mt: 2 }}
+              inputProps={{
+                onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    (e.currentTarget as HTMLInputElement).blur();
+                  }
+                }
+              }}
+            />
+            {/* Banner bottom padding controls removed */}
           </div>
         )}
       </div>
@@ -779,15 +739,7 @@ const [headerHtml, setHeaderHtml] = useState('');
 const [bodyHtml, setBodyHtml] = useState('');
 const [footerHtml, setFooterHtml] = useState('');
 const [finalHtml, setFinalHtml] = useState('');
-  // Bottom padding controls for each major section
-  const [headerPaddingEnabled, setHeaderPaddingEnabled] = useState(false);
-  const [headerPadding, setHeaderPadding] = useState(25);
-  const [heroPaddingEnabled, setHeroPaddingEnabled] = useState(false);
-  const [heroPadding, setHeroPadding] = useState(25);
-  const [bannerPaddingEnabled, setBannerPaddingEnabled] = useState(false);
-  const [bannerPadding, setBannerPadding] = useState(25);
-  const [footerPaddingEnabled, setFooterPaddingEnabled] = useState(false);
-  const [footerPadding, setFooterPadding] = useState(25);
+  // Bottom padding controls removed
   const [showAddSectionMenu, setShowAddSectionMenu] = useState(false);
   const addSectionRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -813,6 +765,11 @@ const [finalHtml, setFinalHtml] = useState('');
    * for future extension.
    */
   const [showBrandPanel, setShowBrandPanel] = useState(false);
+  const [brandName, setBrandName] = useState('belle and bloom');
+  // Top loading bar (buffer variant)
+  const [progress, setProgress] = useState<number>(-1);
+  const [buffer, setBuffer] = useState<number>(-1);
+  const [loading, setLoading] = useState<boolean>(false);
   const [brandFont, setBrandFont] = useState('');
   const [brandPrimary, setBrandPrimary] = useState('#d19aa0');
   const [brandSecondary, setBrandSecondary] = useState('#F0C3C7');
@@ -822,7 +779,8 @@ const [finalHtml, setFinalHtml] = useState('');
   /** Notifications for user feedback. Each notification has a unique id
    * and a message. Notifications are displayed in a stack in the
    * top‑right corner and fade out after a short delay. */
-  const [notifications, setNotifications] = useState<{ id: number; message: ReactNode }[]>([]);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMsg, setSnackbarMsg] = useState<ReactNode>('');
 
   /**
    * Track which code blocks are expanded in the right‑panel accordion. Keys
@@ -849,12 +807,8 @@ const [finalHtml, setFinalHtml] = useState('');
    * feedback to the user.
    */
   const addNotification = useCallback((message: ReactNode) => {
-    const id = Date.now() + Math.random();
-    setNotifications((prev) => [...prev, { id, message }]);
-    // Remove after 3 seconds
-    setTimeout(() => {
-      setNotifications((prev) => prev.filter((n) => n.id !== id));
-    }, 3000);
+    setSnackbarMsg(message);
+    setSnackbarOpen(true);
   }, []);
 
   /**
@@ -953,7 +907,8 @@ const [finalHtml, setFinalHtml] = useState('');
   const [heroTemplates, setHeroTemplates] = useState<HeroTemplate[]>(defaultHeroTemplates);
   const [selectedHeroId, setSelectedHeroId] = useState<string>(defaultHeroTemplates[0].id);
   const [heroImage, setHeroImage] = useState<string>('');
-  const [heroAlt, setHeroAlt] = useState<string>('');
+  // Pre-fill hero alt with brand name (or a sensible default)
+  const [heroAlt, setHeroAlt] = useState<string>(brandName || 'Brand');
   const [heroHref, setHeroHref] = useState<string>('');
   const [heroHtml, setHeroHtml] = useState<string>('');
   const [heroEditMode, setHeroEditMode] = useState<boolean>(false);
@@ -982,7 +937,8 @@ const [finalHtml, setFinalHtml] = useState('');
   const [bannerTemplates, setBannerTemplates] = useState<BannerTemplate[]>(defaultBannerTemplates);
   const [selectedBannerId, setSelectedBannerId] = useState<string>(defaultBannerTemplates[0].id);
   const [bannerImage, setBannerImage] = useState<string>('');
-  const [bannerAlt, setBannerAlt] = useState<string>('');
+  // Pre-fill banner alt with brand name (or a sensible default)
+  const [bannerAlt, setBannerAlt] = useState<string>(brandName || 'Brand');
   const [bannerHref, setBannerHref] = useState<string>('');
   const [bannerHtml, setBannerHtml] = useState<string>('');
   const [bannerEditMode, setBannerEditMode] = useState<boolean>(false);
@@ -1001,13 +957,14 @@ const [finalHtml, setFinalHtml] = useState('');
           setHeroImages(heroData.images);
           setHeroImage(heroData.images[0]);
           setHeroHref(brandWebsite);
-          setHeroAlt('');
+          // Prefill alt with brand name so input is not empty/placeholder
+          setHeroAlt(brandName || 'Brand');
         }
       }
     } catch (err) {
       console.warn('Failed to fetch hero images', err);
     }
-  }, [brandWebsite]);
+  }, [brandWebsite, brandName]);
 
   const fetchBannerForBrand = useCallback(async () => {
     if (!brandWebsite) return;
@@ -1018,13 +975,14 @@ const [finalHtml, setFinalHtml] = useState('');
         if (data.image) {
           setBannerImage(data.image);
           setBannerHref(brandWebsite);
-          setBannerAlt('');
+          // Prefill alt with brand name so input is not empty/placeholder
+          setBannerAlt(brandName || 'Brand');
         }
       }
     } catch (err) {
       console.warn('Failed to fetch banner image', err);
     }
-  }, [brandWebsite]);
+  }, [brandWebsite, brandName]);
 
   /**
    * Fetch hero images for the configured brand website. This runs on
@@ -1086,10 +1044,7 @@ const [finalHtml, setFinalHtml] = useState('');
       urls: [''],
       products: [],
       selectedBodyId: defaultBodyTemplates[0].id,
-      loading: false,
-      paddingEnabled: false,
-      padding: 25,
-      ctaBg: '#d19aa0'
+      loading: false
     };
     setBodySections((prev) => [...prev, newSection]);
     setSectionOrder((prev) => {
@@ -1282,9 +1237,6 @@ const [finalHtml, setFinalHtml] = useState('');
       headerStr = headerTemplate ? headerTemplate.html : '';
       headerStr = applyBrandColoursAndFont(headerStr);
       headerStr = applyBrandLogo(headerStr);
-      if (headerPaddingEnabled) {
-        headerStr = addPaddingToTable(headerStr, headerPadding);
-      }
     }
     // Compose hero if an image has been set
     let heroStr = '';
@@ -1295,14 +1247,12 @@ const [finalHtml, setFinalHtml] = useState('');
         heroAlt: heroAlt || '',
         heroHref: heroHref || ''
       };
+      if (!heroData.heroAlt && brandName) heroData.heroAlt = brandName;
       // Render hero using the full template object. Passing the raw
       // HTML string causes renderTemplate to receive undefined for
       // template.html and results in runtime errors. See data/templates.ts.
       heroStr = renderTemplate(heroTemplate as any, heroData);
       heroStr = applyBrandColoursAndFont(heroStr);
-      if (heroPaddingEnabled) {
-        heroStr = addPaddingToTable(heroStr, heroPadding);
-      }
     }
     // Compose body across all sections
     const bodyHtmlMap: Record<string, string> = {};
@@ -1316,31 +1266,7 @@ const [finalHtml, setFinalHtml] = useState('');
         }
         const tpl = bodyTemplates.find((t) => t.id === templateIdToUse);
         if (!tpl) return;
-        // Build colour swatches HTML: up to three colours displayed
-        // as 24x24 squares separated by 8px spacing. Colours are
-        // filtered to remove white/grey backgrounds. If there are
-        // additional colours beyond the first three, we append a
-        // plus symbol in a white square. This HTML is injected into
-        // the template via the {{coloursHtml}} placeholder.
-        const rawColours = Array.isArray(prod.colors) ? prod.colors : [];
-        const colours = rawColours
-          .filter((c) => typeof c === 'string' && c.trim() && !/^(#?fff(?:fff)?|#?f7f7f7)$/i.test(c.trim()))
-          .slice(0, 3);
-        let coloursHtmlStr = '';
-        if (colours.length > 0) {
-          let swatchCells = '';
-          colours.forEach((colour, idx) => {
-            swatchCells += `<td width="24" height="24" style="background:${colour};"></td>`;
-            if (idx < colours.length - 1) {
-              swatchCells += '<td width="8"></td>';
-            }
-          });
-          if (rawColours.length > colours.length) {
-            if (swatchCells) swatchCells += '<td width="8"></td>';
-            swatchCells += '<td width="24" height="24" style="background:#ffffff;text-align:center;line-height:24px;font-family:\'Montserrat\',Arial,Helvetica,sans-serif;font-size:14px;color:#333333;">+</td>';
-          }
-          coloursHtmlStr = `<div style="text-align:right !important;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;"><tr>${swatchCells}</tr></table></div>`;
-        }
+        // Colour swatches removed per refactor
         // Build price HTML: include a strike‑through original price if
         // provided and different from the sale price. We leave the
         // currency as provided by the parser. If no original price is
@@ -1354,24 +1280,34 @@ const [finalHtml, setFinalHtml] = useState('');
         } else {
           priceHtml = salePrice;
         }
+        // Choose description source per section
+        let chosenDescription = (prod as any).description || '';
+        if (section.descriptionSource === 'p' && (prod as any).descriptionP) {
+          chosenDescription = (prod as any).descriptionP;
+        } else if (section.descriptionSource === 'ul' && (prod as any).descriptionUl) {
+          chosenDescription = (prod as any).descriptionUl;
+        }
+        const ds = (prod as any).descSource || 'metadata';
+        // For UL in code view, use a marker to later swap the paragraph with UL markup
+        const descForTemplate = ds === 'ul' && (prod as any).descriptionUl ? '[[DESC_MARKER]]' : chosenDescription;
         const productData: any = {
           ...prod,
+          description: descForTemplate,
           ctaLabel: (prod as any).ctaLabel || 'SHOP NOW',
-          coloursHtml: coloursHtmlStr,
-          colorsHtml: coloursHtmlStr,
           priceHtml,
-          ctaBg: section.ctaBg
+          ctaBg: brandPrimary
         };
         // Render module using the full template. Passing only
         // tpl.html causes runtime errors because renderTemplate
         // expects a Template object.
         let moduleHtml = renderTemplate(tpl as any, productData);
+        if (ds === 'ul' && (prod as any).descriptionUl) {
+          const ulHtml = (prod as any).descriptionUl as string;
+          moduleHtml = moduleHtml.replace(/<p[^>]*>\s*\[\[DESC_MARKER\]\]\s*<\/p>/i, ulHtml);
+        }
         moduleHtml = applyBrandColoursAndFont(moduleHtml);
         sectionHtml += moduleHtml;
       });
-      if (section.paddingEnabled) {
-        sectionHtml = addPaddingToTable(sectionHtml, section.padding, true);
-      }
       bodyHtmlMap[`body-${section.id}`] = sectionHtml;
     });
     // Compose banner if an image has been fetched
@@ -1383,11 +1319,9 @@ const [finalHtml, setFinalHtml] = useState('');
         bannerAlt: bannerAlt || '',
         bannerHref: bannerHref || ''
       };
+      if (!data.bannerAlt && brandName) data.bannerAlt = brandName;
       bannerStr = renderTemplate(bannerTemplate as any, data);
       bannerStr = applyBrandColoursAndFont(bannerStr);
-      if (bannerPaddingEnabled) {
-        bannerStr = addPaddingToTable(bannerStr, bannerPadding);
-      }
     }
     // Compose footer
     let footerStr = '';
@@ -1395,9 +1329,6 @@ const [finalHtml, setFinalHtml] = useState('');
       const footerTemplate = footerTemplates.find((t) => t.id === selectedFooterId);
       footerStr = footerTemplate ? footerTemplate.html : '';
       footerStr = applyBrandColoursAndFont(footerStr);
-      if (footerPaddingEnabled) {
-        footerStr = addPaddingToTable(footerStr, footerPadding);
-      }
     }
     let orderedHtml = '';
     sectionOrder.forEach((id) => {
@@ -1412,7 +1343,7 @@ const [finalHtml, setFinalHtml] = useState('');
     setBannerHtml(bannerStr);
     setFooterHtml(footerStr);
     setFinalHtml(`${headerStr}${orderedHtml}${footerStr}`);
-  }, [bodySections, selectedBodyId, selectedHeaderId, selectedFooterId, selectedBannerId, bodyTemplates, headerTemplates, footerTemplates, bannerTemplates, brandPrimary, brandSecondary, brandFont, brandLogoDataUrl, heroImage, heroAlt, heroHref, bannerImage, bannerAlt, bannerHref, selectedHeroId, heroTemplates, showHeaderSection, showHeroSection, showBannerSection, showFooterSection, headerPaddingEnabled, headerPadding, heroPaddingEnabled, heroPadding, bannerPaddingEnabled, bannerPadding, footerPaddingEnabled, footerPadding, sectionOrder]);
+  }, [bodySections, selectedBodyId, selectedHeaderId, selectedFooterId, selectedBannerId, bodyTemplates, headerTemplates, footerTemplates, bannerTemplates, brandPrimary, brandSecondary, brandFont, brandLogoDataUrl, heroImage, heroAlt, heroHref, bannerImage, bannerAlt, bannerHref, selectedHeroId, heroTemplates, showHeaderSection, showHeroSection, showBannerSection, showFooterSection, sectionOrder]);
 
   /**
    * PrismJS reference and load state. We load Prism only on the client
@@ -1478,26 +1409,7 @@ const [finalHtml, setFinalHtml] = useState('');
       }
       const tpl = bodyTemplates.find((t) => t.id === templateIdToUse);
       if (!tpl) return;
-      // Build colours HTML (up to 3 colours) with plus sign if more
-      const rawColours: string[] = Array.isArray((prod as any).colors)
-        ? ((prod as any).colors as string[])
-        : [];
-      const colours: string[] = rawColours
-        .filter((c) => typeof c === 'string' && c.trim() && !/^(#?fff(?:fff)?|#?f7f7f7)$/i.test(c.trim()))
-        .slice(0, 3);
-      let coloursHtmlStr = '';
-      if (colours.length > 0) {
-        let swatchCells = '';
-        colours.forEach((colour, cidx) => {
-          swatchCells += `<td width="24" height="24" style="background:${colour};"></td>`;
-          if (cidx < colours.length - 1) swatchCells += '<td width="8"></td>';
-        });
-        if (rawColours.length > colours.length) {
-          if (swatchCells) swatchCells += '<td width="8"></td>';
-          swatchCells += '<td width="24" height="24" style="background:#ffffff;text-align:center;line-height:24px;font-family:\'Montserrat\',Arial,Helvetica,sans-serif;font-size:14px;color:#333333;">+</td>';
-        }
-        coloursHtmlStr = `<div style="text-align:right !important;"><table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;"><tr>${swatchCells}</tr></table></div>`;
-      }
+      // Colour swatches removed in refactor
       // Build price HTML: include original price if different
       const salePrice = (prod as any).price || '';
       const originalPrice = (prod as any).originalPrice;
@@ -1508,13 +1420,19 @@ const [finalHtml, setFinalHtml] = useState('');
         priceHtml = salePrice;
       }
       // Compose data object for templating
-      const data: any = {
-        ...prod,
-        ctaLabel: (prod as any).ctaLabel || 'SHOP NOW',
-        coloursHtml: coloursHtmlStr,
-        colorsHtml: coloursHtmlStr,
-        priceHtml,
-        ctaBg: section.ctaBg
+        // Choose description for code view as well
+        let chosenDesc2 = (prod as any).description || '';
+        if (section.descriptionSource === 'p' && (prod as any).descriptionP) {
+          chosenDesc2 = (prod as any).descriptionP as string;
+        } else if (section.descriptionSource === 'ul' && (prod as any).descriptionUl) {
+          chosenDesc2 = (prod as any).descriptionUl as string;
+        }
+        const data: any = {
+          ...prod,
+          description: chosenDesc2,
+          ctaLabel: (prod as any).ctaLabel || 'SHOP NOW',
+          priceHtml,
+          ctaBg: brandPrimary
       };
       // Render HTML and apply brand customisations
       let html = renderTemplate(tpl as any, data);
@@ -1633,24 +1551,20 @@ const [finalHtml, setFinalHtml] = useState('');
    * is updated immutably to ensure React re-renders appropriately.
    */
   const handleUrlChange = (sectionId: number, index: number, value: string) => {
-    setBodySections((prev) =>
-      prev.map((section) => {
-        if (section.id !== sectionId) return section;
-        const newUrls = [...section.urls];
-        newUrls[index] = value;
-        return { ...section, urls: newUrls };
-      })
-    );
+    setDraftUrls((prev) => {
+      const current = prev[sectionId] ?? getDraftUrls(sectionId);
+      const next = [...current];
+      next[index] = value;
+      return { ...prev, [sectionId]: next };
+    });
   };
   // Add a new blank URL input to a section. Optionally focus the newly
   // created field by passing its index.
   const addUrlField = (sectionId: number, focusIndex?: number) => {
-    setBodySections((prev) =>
-      prev.map((section) => {
-        if (section.id !== sectionId) return section;
-        return { ...section, urls: [...section.urls, ''] };
-      })
-    );
+    setDraftUrls((prev) => {
+      const current = prev[sectionId] ?? getDraftUrls(sectionId);
+      return { ...prev, [sectionId]: [...current, ''] };
+    });
     if (focusIndex !== undefined) {
       setTimeout(() => {
         const el = document.getElementById(`url-${sectionId}-${focusIndex}`) as HTMLInputElement | null;
@@ -1660,12 +1574,10 @@ const [finalHtml, setFinalHtml] = useState('');
   };
   // Remove a URL input from a section at index.
   const removeUrlField = (sectionId: number, index: number) => {
-    setBodySections((prev) =>
-      prev.map((section) => {
-        if (section.id !== sectionId) return section;
-        return { ...section, urls: section.urls.filter((_, i) => i !== index) };
-      })
-    );
+    setDraftUrls((prev) => {
+      const current = prev[sectionId] ?? getDraftUrls(sectionId);
+      return { ...prev, [sectionId]: current.filter((_, i) => i !== index) };
+    });
   };
 
   /**
@@ -1814,7 +1726,7 @@ const [finalHtml, setFinalHtml] = useState('');
   const generateSection = async (sectionId: number) => {
     const section = bodySections.find((s) => s.id === sectionId);
     if (!section) return;
-    const filtered = section.urls.map((u) => u.trim()).filter((u) => u);
+    const filtered = (draftUrls[sectionId] ?? section.urls).map((u) => u.trim()).filter((u) => u);
     if (filtered.length === 0) {
       alert('Please provide at least one product URL.');
       return;
@@ -1824,6 +1736,10 @@ const [finalHtml, setFinalHtml] = useState('');
       prev.map((s) => (s.id === sectionId ? { ...s, loading: true, products: [] } : s))
     );
     try {
+      // Start loading bar immediately
+      setLoading(true);
+      setProgress(0);
+      setBuffer(15);
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1832,9 +1748,16 @@ const [finalHtml, setFinalHtml] = useState('');
       if (!res.ok) {
         throw new Error(`Request failed with status ${res.status}`);
       }
+      // Response received
+      setProgress(20);
+      setBuffer(40);
       const data = (await res.json()) as GenerateResponse;
+      // Parsed JSON
+      setProgress(30);
+      setBuffer(50);
       const processed: ProductData[] = [];
       const validUrls: string[] = [];
+      const totalItems = Math.max(1, data.products.length || 0);
       data.products.forEach((p: any, idx: number) => {
         const hasInfo = Object.keys(p || {}).some(
           (key) => key !== 'url' && p[key]
@@ -1852,13 +1775,24 @@ const [finalHtml, setFinalHtml] = useState('');
           price: p.price || '',
           originalPrice: p.originalPrice || undefined,
           description: p.description || '',
+          // Additional description sources scraped from .product__description
+          // (plain text from <p> and joined text from <ul>)
+          descriptionP: p.descriptionP || '',
+          descriptionUl: p.descriptionUl || '',
           image: p.image || '',
           images: Array.isArray(p.images) ? p.images : undefined,
-          colors: Array.isArray(p.colors) ? p.colors : [],
           cta: p.cta || p.url,
           ctaLabel: (p as any).ctaLabel || 'SHOP NOW'
         });
+        // Process items linearly: advance from 30% up to 90%
+        const pct = 30 + Math.round(((idx + 1) / totalItems) * 60);
+        const prog = Math.min(90, pct);
+        setProgress(prog);
+        setBuffer(Math.min(100, prog + 10));
       });
+      // Final composition
+      setProgress(95);
+      setBuffer(100);
       setBodySections((prev) =>
         prev.map((s) =>
           s.id === sectionId
@@ -1866,12 +1800,24 @@ const [finalHtml, setFinalHtml] = useState('');
             : s
         )
       );
+      setDraftUrls((prev) => ({ ...prev, [sectionId]: [...validUrls, ''] }));
+      setProgress(100); // complete
+      // Hide after a short delay to avoid flicker, then reset
+      setTimeout(() => {
+        setLoading(false);
+        setProgress(-1);
+        setBuffer(-1);
+      }, 200);
     } catch (error: any) {
       console.error('Generation failed', error);
       alert(`Failed to generate products: ${error.message}`);
       setBodySections((prev) =>
         prev.map((s) => (s.id === sectionId ? { ...s, loading: false } : s))
       );
+      // Ensure the loading bar hides on error
+      setLoading(false);
+      setProgress(-1);
+      setBuffer(-1);
     }
   };
 
@@ -1888,6 +1834,7 @@ const [finalHtml, setFinalHtml] = useState('');
    * code for every module.
    */
   const generateAllSections = async () => {
+    // Delegate progress updates to each section's generation to avoid conflicting values
     for (const section of bodySections) {
       await generateSection(section.id);
     }
@@ -1966,16 +1913,7 @@ const [finalHtml, setFinalHtml] = useState('');
     ...(!showFooterSection ? [{ key: 'footer', label: 'Footer' }] : []),
   ];
 
-  const headingStyle: React.CSSProperties = {
-    fontSize: '2rem',
-    padding: '20px',
-    border: '1px solid #e5e7eb',
-    borderRadius: 'var(--radius-small)',
-    marginBottom: '2rem',
-    backgroundColor: 'var(--color-surface)',
-    boxShadow: 'var(--shadow-light)',
-    fontWeight: '300'
-  };
+  // Top heading moved into AppBar via AppLayout
 
   return (
     <>
@@ -1983,112 +1921,86 @@ const [finalHtml, setFinalHtml] = useState('');
         <title>EDM Expresso</title>
         <meta name="description" content="Build modular EDMs from product pages" />
       </Head>
-      <main className="fade-in">
-        <h1 style={headingStyle}>EDM Expresso</h1>
-        <div className="page-container">
-          {/* Left panel with accordion */}
-          <div className="left-panel">
+      <AppLayout
+        title="EDM Espresso"
+        left={<div className={`accordion-list${openSection ? ' has-open' : ''}`} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             {/* Button to add another body section */}
             {/* The Add Body Section button has been relocated to the bottom row
                next to the Generate EDM button. The original container
                has been removed to avoid duplicate controls. */}
             {/* Header section */}
             {showHeaderSection && (
-              <div className="accordion-section">
-                <div className="accordion-header" onClick={() => handleAccordionToggle('header')}>
+              <div className={`accordion-section${openSection === 'header' ? ' open' : ''}`}>
+                <div className={`accordion-header${openSection === 'header' ? ' open' : ''}`} onClick={() => handleAccordionToggle('header')}>
                   <span>Header</span>
-                  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <button
-                      className="icon-button"
+                  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--gap-2)' }}>
+                    <IconButton
                       onClick={(e) => {
                         e.stopPropagation();
                         removeHeaderSection();
                       }}
                       title="Remove section"
                     >
-                      <FontAwesomeIcon icon={faTrash} />
-                    </button>
-                    <button
-                      className="icon-button"
+                      <DeleteIcon fontSize="medium" />
+                    </IconButton>
+                    <IconButton
                       onClick={(e) => {
                         e.stopPropagation();
                         handleAccordionToggle('header');
                       }}
                       title={openSection === 'header' ? 'Collapse section' : 'Expand section'}
                     >
-                      <FontAwesomeIcon icon={openSection === 'header' ? faMinus : faPlus} />
-                    </button>
+                      {openSection === 'header' ? <ExpandLessIcon fontSize="medium" /> : <ExpandMoreIcon fontSize="medium" />}
+                    </IconButton>
                   </div>
                 </div>
                 {openSection === 'header' && (
                   <div className="accordion-content">
-                  <h3 style={{ fontSize: '1rem', margin: '0 0 0.5rem' }}>Template</h3>
                   {/* Hero template selector label */}
-                  <div className="template-row">
-                    <select className="template-select" value={selectedHeaderId} onChange={(e) => setSelectedHeaderId(e.target.value)}>
-                      {headerTemplates.map((tpl) => (
-                        <option key={tpl.id} value={tpl.id}>{tpl.name}</option>
-                      ))}
-                    </select>
-                    <button className="icon-button" onClick={() => setHeaderEditMode((v) => !v)} title={headerEditMode ? 'Close editor' : 'Edit template'}>
-                      <FontAwesomeIcon icon={faPen} />
-                    </button>
-                    <button className="icon-button" onClick={() => setShowNewHeader((v) => !v)} title={showNewHeader ? 'Cancel new template' : 'Add new template'}>
-                      <FontAwesomeIcon icon={faPlus} />
-                    </button>
+                  <div className="template-row" style={{ display: 'flex', gap: 'var(--gap-2)', alignItems: 'center' }}>
+                    <FormControl fullWidth variant="outlined">
+                      <InputLabel id="header-template-label">Template</InputLabel>
+                      <Select labelId="header-template-label" id="header-template-select" label="Template" value={selectedHeaderId} onChange={(e) => setSelectedHeaderId(e.target.value)}>
+                        {headerTemplates.map((tpl) => (
+                          <MenuItem key={tpl.id} value={tpl.id}>{tpl.name}</MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    <IconButton onClick={() => setHeaderEditMode((v) => !v)} title={headerEditMode ? 'Close editor' : 'Edit template'}>
+                      <EditIcon fontSize="medium" />
+                    </IconButton>
+                    <IconButton onClick={() => setShowNewHeader((v) => !v)} title={showNewHeader ? 'Cancel new template' : 'Add new template'}>
+                      <AddIcon fontSize="medium" />
+                    </IconButton>
                   </div>
                   {headerEditMode && (
                     <div>
-                      <textarea value={draftHeaderHtml} onChange={(e) => setDraftHeaderHtml(e.target.value)} rows={8} style={{ fontFamily: 'monospace', width: '100%' }} />
-                      <div className="new-template-actions">
-                        <button className="icon-button" onClick={() => setHeaderEditMode(false)} title="Cancel edit">
-                          <FontAwesomeIcon icon={faTimes} />
-                        </button>
-                        <button className="icon-button" onClick={() => { saveHeaderEdits(); setHeaderEditMode(false); }} title="Save edits">
-                          <FontAwesomeIcon icon={faSave} />
-                        </button>
+                      <TextField id="header-draft-html" label="Template HTML" value={draftHeaderHtml} onChange={(e) => setDraftHeaderHtml(e.target.value)} rows={8} fullWidth multiline sx={{ fontFamily: 'monospace' }} />
+                      <div className="new-template-actions" style={{ display: 'flex', gap: 'var(--gap-2)', marginTop: '0.5rem' }}>
+                        <IconButton onClick={() => setHeaderEditMode(false)} title="Cancel edit">
+                          <CloseIcon2 fontSize="medium" />
+                        </IconButton>
+                        <IconButton onClick={() => { saveHeaderEdits(); setHeaderEditMode(false); }} title="Save edits">
+                          <SaveIcon fontSize="medium" />
+                        </IconButton>
                       </div>
                     </div>
                   )}
                   {showNewHeader && (
                     <div className="new-template-form">
-                      <input type="text" placeholder="Template name" value={newHeaderName} onChange={(e) => setNewHeaderName(e.target.value)} />
-                      <textarea placeholder="HTML" value={newHeaderHtml} onChange={(e) => setNewHeaderHtml(e.target.value)} rows={6} style={{ fontFamily: 'monospace', width: '100%' }} />
-                      <div className="new-template-actions">
-                        <button className="icon-button" onClick={() => { setShowNewHeader(false); setNewHeaderName(''); setNewHeaderHtml(''); }} title="Cancel new template">
-                          <FontAwesomeIcon icon={faTimes} />
-                        </button>
-                        <button className="icon-button" onClick={() => { addNewHeaderTemplate(); setShowNewHeader(false); }} title="Save new template">
-                          <FontAwesomeIcon icon={faSave} />
-                        </button>
+                      <TextField id="header-new-name" label="Template name" type="text" value={newHeaderName} onChange={(e) => setNewHeaderName(e.target.value)} fullWidth sx={{ mb: 1 }} />
+                      <TextField id="header-new-html" label="Template HTML" value={newHeaderHtml} onChange={(e) => setNewHeaderHtml(e.target.value)} rows={6} fullWidth multiline sx={{ fontFamily: 'monospace' }} />
+                      <div className="new-template-actions" style={{ display: 'flex', gap: 'var(--gap-2)', marginTop: '0.5rem' }}>
+                        <IconButton onClick={() => { setShowNewHeader(false); setNewHeaderName(''); setNewHeaderHtml(''); }} title="Cancel new template">
+                          <CloseIcon2 fontSize="medium" />
+                        </IconButton>
+                        <IconButton onClick={() => { addNewHeaderTemplate(); setShowNewHeader(false); }} title="Save new template">
+                          <SaveIcon fontSize="medium" />
+                        </IconButton>
                       </div>
                     </div>
                   )}
-                  <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span>Enable bottom padding</span>
-                      <label className="toggle-switch">
-                        <input
-                          type="checkbox"
-                          checked={headerPaddingEnabled}
-                          onChange={(e) => setHeaderPaddingEnabled(e.target.checked)}
-                        />
-                        <span className="slider" />
-                      </label>
-                    </div>
-                    {headerPaddingEnabled && (
-                      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <input
-                          type="range"
-                          min={0}
-                          max={100}
-                          value={headerPadding}
-                          onChange={(e) => setHeaderPadding(Number(e.target.value))}
-                        />
-                        <span>{headerPadding}px</span>
-                      </div>
-                    )}
-                  </div>
+                  {/* Header bottom padding controls removed */}
                 </div>
               )}
               </div>
@@ -2115,412 +2027,370 @@ const [finalHtml, setFinalHtml] = useState('');
 
             {/* Footer section */}
             {showFooterSection && (
-              <div className="accordion-section">
-                <div className="accordion-header" onClick={() => handleAccordionToggle('footer')}>
+              <div className={`accordion-section${openSection === 'footer' ? ' open' : ''}`}>
+                <div className={`accordion-header${openSection === 'footer' ? ' open' : ''}`} onClick={() => handleAccordionToggle('footer')}>
                   <span>Footer</span>
-                  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <button
-                      className="icon-button"
+                  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 'var(--gap-2)' }}>
+                    <IconButton
                       onClick={(e) => {
                         e.stopPropagation();
                         removeFooterSection();
                       }}
                       title="Remove section"
                     >
-                      <FontAwesomeIcon icon={faTrash} />
-                    </button>
-                    <button
-                      className="icon-button"
+                      <DeleteIcon fontSize="medium" />
+                    </IconButton>
+                    <IconButton
                       onClick={(e) => {
                         e.stopPropagation();
                         handleAccordionToggle('footer');
                       }}
                       title={openSection === 'footer' ? 'Collapse section' : 'Expand section'}
                     >
-                      <FontAwesomeIcon icon={openSection === 'footer' ? faMinus : faPlus} />
-                    </button>
+                      {openSection === 'footer' ? <ExpandLessIcon fontSize="medium" /> : <ExpandMoreIcon fontSize="medium" />}
+                    </IconButton>
                   </div>
                 </div>
                 {openSection === 'footer' && (
                   <div className="accordion-content">
-                  <h3 style={{ fontSize: '1rem', margin: '0 0 0.5rem' }}>Template</h3>
-                  <div className="template-row">
-                    <select className="template-select" value={selectedFooterId} onChange={(e) => setSelectedFooterId(e.target.value)}>
-                      {footerTemplates.map((tpl) => (
-                        <option key={tpl.id} value={tpl.id}>{tpl.name}</option>
-                      ))}
-                    </select>
-                    <button className="icon-button" onClick={() => setFooterEditMode((v) => !v)} title={footerEditMode ? 'Close editor' : 'Edit template'}>
-                      <FontAwesomeIcon icon={faPen} />
-                    </button>
-                    <button className="icon-button" onClick={() => setShowNewFooter((v) => !v)} title={showNewFooter ? 'Cancel new template' : 'Add new template'}>
-                      <FontAwesomeIcon icon={faPlus} />
-                    </button>
+                  <div className="template-row" style={{ display: 'flex', gap: 'var(--gap-2)', alignItems: 'center' }}>
+                    <FormControl fullWidth variant="outlined">
+                      <InputLabel id="footer-template-label">Template</InputLabel>
+                      <Select labelId="footer-template-label" id="footer-template-select" label="Template" value={selectedFooterId}  onChange={(e) => setSelectedFooterId(e.target.value)}>
+                        {footerTemplates.map((tpl) => (
+                          <MenuItem key={tpl.id} value={tpl.id}>{tpl.name}</MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    <IconButton onClick={() => setFooterEditMode((v) => !v)} title={footerEditMode ? 'Close editor' : 'Edit template'}>
+                      <EditIcon fontSize="medium" />
+                    </IconButton>
+                    <IconButton onClick={() => setShowNewFooter((v) => !v)} title={showNewFooter ? 'Cancel new template' : 'Add new template'}>
+                      <AddIcon fontSize="medium" />
+                    </IconButton>
                   </div>
                   {footerEditMode && (
                     <div>
-                      <textarea value={draftFooterHtml} onChange={(e) => setDraftFooterHtml(e.target.value)} rows={8} style={{ fontFamily: 'monospace', width: '100%' }} />
-                      <div className="new-template-actions">
-                        <button className="icon-button" onClick={() => setFooterEditMode(false)} title="Cancel edit">
-                          <FontAwesomeIcon icon={faTimes} />
-                        </button>
-                        <button className="icon-button" onClick={() => { saveFooterEdits(); setFooterEditMode(false); }} title="Save edits">
-                          <FontAwesomeIcon icon={faSave} />
-                        </button>
+                        <TextField id="footer-draft-html" label="Template HTML" value={draftFooterHtml} onChange={(e) => setDraftFooterHtml(e.target.value)} rows={8} fullWidth multiline sx={{ fontFamily: 'monospace' }} />
+                      <div className="new-template-actions" style={{ display: 'flex', gap: 'var(--gap-2)', marginTop: '0.5rem' }}>
+                        <IconButton onClick={() => setFooterEditMode(false)} title="Cancel edit">
+                          <CloseIcon2 fontSize="medium" />
+                        </IconButton>
+                        <IconButton onClick={() => { saveFooterEdits(); setFooterEditMode(false); }} title="Save edits">
+                          <SaveIcon fontSize="medium" />
+                        </IconButton>
                       </div>
                     </div>
                   )}
                   {showNewFooter && (
                     <div className="new-template-form">
-                      <input type="text" placeholder="Template name" value={newFooterName} onChange={(e) => setNewFooterName(e.target.value)} />
-                      <textarea placeholder="HTML" value={newFooterHtml} onChange={(e) => setNewFooterHtml(e.target.value)} rows={6} style={{ fontFamily: 'monospace', width: '100%' }} />
-                      <div className="new-template-actions">
-                        <button className="icon-button" onClick={() => { setShowNewFooter(false); setNewFooterName(''); setNewFooterHtml(''); }} title="Cancel new template">
-                          <FontAwesomeIcon icon={faTimes} />
-                        </button>
-                        <button className="icon-button" onClick={() => { addNewFooterTemplate(); setShowNewFooter(false); }} title="Save new template">
-                          <FontAwesomeIcon icon={faSave} />
-                        </button>
+                      <TextField id="footer-new-name" label="Template name" type="text" value={newFooterName} onChange={(e) => setNewFooterName(e.target.value)} fullWidth sx={{ mb: 1 }} />
+                      <TextField id="footer-new-html" label="Template HTML" value={newFooterHtml} onChange={(e) => setNewFooterHtml(e.target.value)} rows={6} fullWidth multiline sx={{ fontFamily: 'monospace' }} />
+                      <div className="new-template-actions" style={{ display: 'flex', gap: 'var(--gap-2)', marginTop: '0.5rem' }}>
+                        <IconButton onClick={() => { setShowNewFooter(false); setNewFooterName(''); setNewFooterHtml(''); }} title="Cancel new template">
+                          <CloseIcon2 fontSize="medium" />
+                        </IconButton>
+                        <IconButton onClick={() => { addNewFooterTemplate(); setShowNewFooter(false); }} title="Save new template">
+                          <SaveIcon fontSize="medium" />
+                        </IconButton>
                       </div>
                     </div>
                   )}
-                  <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span>Enable bottom padding</span>
-                      <label className="toggle-switch">
-                        <input
-                          type="checkbox"
-                          checked={footerPaddingEnabled}
-                          onChange={(e) => setFooterPaddingEnabled(e.target.checked)}
-                        />
-                        <span className="slider" />
-                      </label>
-                    </div>
-                    {footerPaddingEnabled && (
-                      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <input
-                          type="range"
-                          min={0}
-                          max={100}
-                          value={footerPadding}
-                          onChange={(e) => setFooterPadding(Number(e.target.value))}
-                        />
-                        <span style={{ width: '45px' }}>{footerPadding}px</span>
-                      </div>
-                    )}
-                  </div>
+                  {/* Footer bottom padding controls removed */}
                 </div>
               )}
               </div>
             )}
 
             {/* Universal Generate EDM button and Add Section button */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '1rem', marginTop: '1rem' }}>
-              <button
-                onClick={generateAllSections}
-                style={{
-                  padding: '0.6rem 1.2rem',
-                  fontSize: '1rem',
-                  border: 'none',
-                  borderRadius: 'var(--radius-small)',
-                  cursor: 'pointer'
-                }}
-              >
-                Generate EDM
-              </button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 'var(--gap-2)', marginTop: '1rem' }}>
+              <Button onClick={generateAllSections}>Generate EDM</Button>
               <div ref={addSectionRef} style={{ position: 'relative', marginLeft: '1rem' }}>
-                <button
-                  onClick={() => setShowAddSectionMenu((v) => !v)}
-                  style={{
-                    padding: '0.6rem 1.2rem',
-                    fontSize: '1rem',
-                    border: 'none',
-                    borderRadius: 'var(--radius-small)',
-                    cursor: 'pointer',
-                    background: 'var(--color-primary)',
-                    color: '#fff'
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-primary-dark)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--color-primary)')}
-                  title="Add section"
-                >
-                  Add Section
-                  <FontAwesomeIcon icon={showAddSectionMenu ? faChevronUp : faChevronDown} style={{ marginLeft: '0.5rem' }} />
-                </button>
+              <Button onClick={() => setShowAddSectionMenu((v) => !v)} title="Add section">
+                  Add Section {showAddSectionMenu ? <ExpandLessIcon sx={{ ml: 0.5 }} /> : <ExpandMoreIcon sx={{ ml: 0.5 }} />}
+                </Button>
                 {showAddSectionMenu && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      marginTop: '0.5rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      background: 'var(--color-primary)',
-                      border: '1px solid var(--color-primary-dark)',
-                      borderRadius: 'var(--radius-small)',
-                      boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-                      zIndex: 10,
-                      minWidth: '12rem',
-                      maxHeight: '12rem',
-                      overflowY: 'auto',
-                      color: '#fff'
-                    }}
-                  >
-                    {availableSectionTypes.map((opt, idx) => (
-                      <button
-                        key={opt.key}
-                        onClick={() => addSectionByType(opt.key)}
-                        style={{
-                          padding: '0.6rem 1rem',
-                          textAlign: 'left',
-                          background: 'var(--color-primary)',
-                          color: '#fff',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontSize: '0.9rem',
-                          borderTop: idx > 0 ? '1px solid var(--color-primary-dark)' : 'none',
-                          display: 'block',
-                          borderRadius: '0px',
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-primary-dark)')}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--color-primary)')}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
+                  <Paper elevation={3} sx={{ position: 'absolute', top: '100%', left: 0, mt: 0.5, zIndex: 10, minWidth: '12rem', maxHeight: '12rem', overflowY: 'auto' }}>
+                    <Stack>
+                      {availableSectionTypes.map((opt) => (
+                        <Button key={opt.key} onClick={() => addSectionByType(opt.key)} sx={{ justifyContent: 'flex-start', px: 2 }}>
+                          {opt.label}
+                        </Button>
+                      ))}
+                    </Stack>
+                  </Paper>
                 )}
               </div>
             </div>
-          </div>
-            {/* Settings gear icon at bottom-left */}
-            <div style={{ position: 'absolute', bottom: '1rem', left: '1rem' }}>
-              <button className="icon-button" onClick={() => setShowBrandPanel(true)} title="Brand customisation">
-                <FontAwesomeIcon icon={faCog} />
-              </button>
-            </div>
-            {/* Right panel */}
-          <div className="right-panel">
-            <div className="preview-bar">
-              <h2 style={{ margin: 0, fontSize: '1.2rem', width: '100%' }}>{viewMode === 'preview' ? 'Email Preview' : 'Email Code'}</h2>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                {/* Toggle between preview and code views. The title on the button
-                   reflects the current state. */}
-                <button
-                  className="icon-button"
-                  onClick={() => setViewMode(viewMode === 'preview' ? 'code' : 'preview')}
-                  title={viewMode === 'preview' ? 'Show code' : 'Show preview'}
-                >
-                  <FontAwesomeIcon icon={viewMode === 'preview' ? faCode : faEye} />
-                </button>
-                {/* Universal copy code button. Copies the entire email HTML,
-                   not just the body. Always visible regardless of view mode. */}
-                <button
-                  className="icon-button"
-                  onClick={() => {
-                    copyToClipboard(finalHtml);
-                    addNotification('Code copied!');
-                  }}
-                  title="Copy full email HTML to clipboard"
-                >
-                  <FontAwesomeIcon icon={faCopy} />
-                </button>
-              </div>
-            </div>
-                {viewMode === 'preview' ? (
-              // In preview mode render the email using interactive
-              // components for the body and hero sections. The
-              // header and footer are still rendered from the
-              // compiled HTML because they are static. The hero
-              // and product modules display edit icons and image
-              // selectors allowing the user to modify the image
-              // directly from the preview. Edits update the
-              // underlying data model and will be reflected in the
-              // generated HTML and code view.
-              <div ref={previewRef} style={{ marginTop: '3.5rem', marginBottom: '6rem' }}>
-                {/* Header preview */}
-                {showHeaderSection && (
-                  <div data-section="header" onClick={() => setOpenSection('header')} dangerouslySetInnerHTML={{ __html: headerHtml }} />
-                )}
-                {sectionOrder.map((id) => {
-                  if (id === 'hero' && showHeroSection && heroImage) {
-                    return (
-                      <div key="hero" data-section="hero">
-                        <HeroTableModule
-                          heroImage={heroImage}
-                          heroAlt={heroAlt}
-                          heroHref={heroHref}
-                          heroImages={heroImages}
-                          updateHero={updateHero}
-                          templateId={selectedHeroId}
-                          paddingBottom={heroPaddingEnabled ? heroPadding : undefined}
-                          onActivate={() => setOpenSection('hero')}
+        </div>}
+        rightOpen={showBrandPanel}
+        onRightClose={() => setShowBrandPanel(false)}
+        onRightToggle={() => setShowBrandPanel((v)=>!v)}
+        progress={progress}
+        buffer={buffer}
+        loading={loading}
+        right={
+          <>
+            <Box sx={{ p: 0 }}>
+              <Typography variant="h6" component="h2">Brand Customisation</Typography>
+            </Box>
+            <Divider sx={{ my: 2 }} />
+            <Stack spacing={2}>
+              <TextField
+                id="brand-name"
+                label="Brand Name"
+                value={brandName}
+                onChange={(e) => setBrandName(e.target.value)}
+                fullWidth
+              />
+              <TextField
+                select
+                fullWidth
+                label="Font"
+                id="brand-font"
+                value={brandFont}
+                onChange={(e) => setBrandFont(e.target.value as string)}
+              >
+                <MenuItem value="">Default (Montserrat)</MenuItem>
+                <MenuItem value="Arial, Helvetica, sans-serif">Arial</MenuItem>
+                <MenuItem value="Georgia, serif">Georgia</MenuItem>
+                <MenuItem value="Times New Roman, serif">Times New Roman</MenuItem>
+                <MenuItem value="Courier New, monospace">Courier New</MenuItem>
+              </TextField>
+
+              <MuiColorInput
+                id="brand-primary"
+                label="Primary Colour"
+                format="hex"
+                value={brandPrimary}
+                onChange={(value) => setBrandPrimary(value || brandPrimary)}
+                size="small"
+              />
+
+              <MuiColorInput
+                id="brand-secondary"
+                label="Secondary Colour"
+                format="hex"
+                value={brandSecondary}
+                onChange={(value) => setBrandSecondary(value || brandSecondary)}
+                size="small"
+              />
+
+              <TextField
+                id="brand-website"
+                label="Website URL"
+                type="url"
+                value={brandWebsite}
+                onChange={(e) => setBrandWebsite(e.target.value)}
+                onBlur={(e) => setBrandWebsite(sanitizeUrl(e.currentTarget.value))}
+                placeholder="https://example.com"
+                fullWidth
+              />
+
+              <TextField
+                id="brand-logo"
+                label="Company Logo"
+                placeholder="No file chosen"
+                value={brandLogo ? (brandLogo as File).name : ''}
+                fullWidth
+                InputProps={{
+                  readOnly: true,
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Button startIcon={<UploadFileIcon />} component="label">
+                        Browse
+                        <input
+                          type="file"
+                          accept="image/*"
+                          hidden
+                          onChange={(e) => {
+                            const file = e.target.files ? e.target.files[0] : null;
+                            setBrandLogo(file);
+                          }}
                         />
-                      </div>
-                    );
-                  }
-                  if (id === 'banner' && showBannerSection && bannerImage) {
-                    return (
+                      </Button>
+                    </InputAdornment>
+                  )
+                }}
+              />
+
+              <Box sx={{ display: 'flex', gap: 1, pt: 1 }}>
+                <Button onClick={() => setShowBrandPanel(false)}>Close</Button>
+                <Button onClick={() => setShowBrandPanel(false)}>Save</Button>
+              </Box>
+            </Stack>
+          </>
+        }
+      >
+            {/* Global top progress when any section loading */}
+            {/* Top progress is now handled by AppLayout's LinearProgress; remove page-level skeleton */}
+            <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)' }}>
+              <div className="preview-bar" style={{ display: 'flex', alignItems: 'center', gap: 'var(--gap-2)', borderBottom: '1px solid #e5e7eb' }}>
+                <Typography variant="h6" sx={{ flex: 1 }}>{viewMode === 'preview' ? 'Email Preview' : 'Email Code'}</Typography>
+                <div className="preview-actions">
+                  <IconButton onClick={() => setViewMode(viewMode === 'preview' ? 'code' : 'preview')} title={viewMode === 'preview' ? 'Show code' : 'Show preview'}>
+                    {viewMode === 'preview' ? <CodeIcon /> : <VisibilityIcon />}
+                  </IconButton>
+                  <IconButton onClick={() => { copyToClipboard(finalHtml); addNotification('Code copied!'); }} title="Copy full email HTML to clipboard">
+                    <ContentCopyIcon />
+                  </IconButton>
+                </div>
+              </div>
+              <div style={{ overflowY: 'auto', overflowX: 'hidden', paddingBottom: '6rem', position: 'relative' }}>
+                {viewMode === 'preview' ? (
+                  <div ref={previewRef} data-preview-container="true">
+                    {showHeaderSection && (
+                      <div data-section="header" onClick={() => setOpenSection('header')} dangerouslySetInnerHTML={{ __html: headerHtml }} />
+                    )}
+                    {sectionOrder.map((id) => {
+                       if (id === 'hero' && showHeroSection && heroImage) {
+                         return (
+                           <div key="hero" data-section="hero">
+                             <HeroTableModule
+                               heroImage={heroImage}
+                               heroAlt={heroAlt || brandName}
+                               heroHref={heroHref}
+                               heroImages={heroImages}
+                               updateHero={updateHero}
+                               templateId={selectedHeroId}
+                               onActivate={() => setOpenSection('hero')}
+                             />
+                           </div>
+                         );
+                       }
+                      if (id === 'banner' && showBannerSection && bannerImage) {
+                        return (
                       <div key="banner" data-section="banner" onClick={() => setOpenSection('banner')} dangerouslySetInnerHTML={{ __html: bannerHtml }} />
-                    );
-                  }
-                  if (id.startsWith('body-')) {
-                    const section = bodySections.find((s) => `body-${s.id}` === id);
-                    if (!section) return null;
-                    return (
-                      <div
-                        key={id}
-                        data-section={`body-${section.id}`}
-                        onClick={() => setOpenSection(`body-${section.id}`)}
-                      >
-                        {section.products.map((prod, idx) => {
+                        );
+                      }
+                      if (id.startsWith('body-')) {
+                        const section = bodySections.find((s) => `body-${s.id}` === id);
+                        if (!section) return null;
+                        return (
+                          <div
+                            key={id}
+                            data-section={`body-${section.id}`}
+                            onClick={() => setOpenSection(`body-${section.id}`)}
+                          >
+                            {section.loading && (
+                              <>
+                                {section.urls.filter(u=>u.trim()).length === 0 ? (
+                                  <Skeleton
+                                    variant="rectangular"
+                                    animation="wave"
+                                    sx={{
+                                      mb: 2,
+                                      width: '100%',
+                                      maxWidth: 600,
+                                      mx: 'auto',
+                                      height: 180,
+                                      borderRadius: 2,
+                                      boxShadow: 'var(--shadow-light)'
+                                    }}
+                                  />
+                                ) : (
+                                  section.urls.filter(u=>u.trim()).map((_,i)=>(
+                                    <Skeleton
+                                      key={i}
+                                      variant="rectangular"
+                                      animation="wave"
+                                      sx={{
+                                        mb: 2,
+                                        width: '100%',
+                                        maxWidth: 600,
+                                        mx: 'auto',
+                                        height: 180,
+                                        borderRadius: 2,
+                                        boxShadow: 'var(--shadow-light)'
+                                      }}
+                                    />
+                                  ))
+                                )}
+                              </>
+                            )}
+                            {section.products.map((prod, idx) => {
                           let orientation: 'left-image' | 'right-image';
                           if (section.selectedBodyId === 'product-image-left-copy-right') {
                             orientation = idx % 2 === 0 ? 'left-image' : 'right-image';
                           } else {
                             orientation = idx % 2 === 0 ? 'right-image' : 'left-image';
                           }
-                          const isLast = idx === section.products.length - 1;
+                          // Choose description source for preview (per-product)
+                          const dsPrev = (prod as any).descSource || 'metadata';
+                          let chosenDescription = (prod as any).description || '';
+                          if (dsPrev === 'p' && (prod as any).descriptionP) {
+                            chosenDescription = (prod as any).descriptionP as string;
+                          } else if (dsPrev === 'ul' && (prod as any).descriptionUl) {
+                            chosenDescription = (prod as any).descriptionUl as string;
+                          }
                           return (
                             <ProductTableModule
                               key={`${section.id}-${idx}`}
-                              product={prod}
+                              product={{ ...prod, description: chosenDescription }}
                               index={idx}
                               orientation={orientation}
                               updateProduct={(i, field, value) => updateProductInSection(section.id, i, field, value)}
-                              paddingBottom={section.paddingEnabled && isLast ? section.padding : undefined}
+                              
                               onActivate={() => setOpenSection(`body-${section.id}`)}
-                              ctaBg={section.ctaBgPreview ?? section.ctaBg}
+                              ctaBg={brandPrimary}
+                              overlayContainerRef={previewRef as any}
+                              brandName={brandName}
+                              descSource={(prod as any).descSource as any}
+                              onChangeDescSource={(src) => updateProductInSection(section.id, idx, 'descSource' as any, src)}
                             />
                           );
                         })}
-                      </div>
-                    );
-                  }
-                  return null;
-                })}
-                {showFooterSection && (
-                  <div data-section="footer" onClick={() => setOpenSection('footer')} dangerouslySetInnerHTML={{ __html: footerHtml }} />
+                          </div>
+                        );
+                      }
+                      return null;
+                    })}
+                    {showFooterSection && (
+                      <div data-section="footer" onClick={() => setOpenSection('footer')} dangerouslySetInnerHTML={{ __html: footerHtml }} />
+                    )}
+                  </div>
+                ) : (
+                  <div className="code-accordion" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap-2)' }}>
+                    {codeSections.map((section) => {
+                      const isOpen = openCodeSections[section.key] !== false;
+                      return (
+                        <div key={section.key} className="code-section">
+                          <div
+                            className="code-section-header"
+                            onClick={() => toggleCodeSection(section.key)}
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', padding: '0.6rem 1rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}
+                          >
+                            <span>{section.title}</span>
+                            <div className="code-actions" style={{ display: 'flex', alignItems: 'center', gap: 'var(--gap-2)' }}>
+                              <IconButton onClick={(e) => { e.stopPropagation(); toggleCodeSection(section.key); }} title={isOpen ? 'Collapse section' : 'Expand section'}>
+                                {isOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                              </IconButton>
+                              <IconButton onClick={(e) => { e.stopPropagation(); copyToClipboard(section.code); addNotification('Code copied!'); }} title="Copy code to clipboard">
+                                <ContentCopyIcon />
+                              </IconButton>
+                            </div>
+                          </div>
+                          {isOpen && (
+                            <pre style={{ margin: 0, maxHeight: '200px', overflow: 'auto', background: '#ffffff', padding: '0.5rem 1rem' }}>
+                              <code dangerouslySetInnerHTML={{ __html: highlight(section.code) }} />
+                            </pre>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
-            ) : (
-              // Code view: render an accordion for each HTML section. Users can
-              // expand or collapse sections independently. A copy icon on
-              // each header allows copying that section’s HTML. The
-              // highlight() helper applies PrismJS syntax highlighting. A
-              // universal copy icon is provided in the preview bar above.
-              <div className="code-accordion" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '3.5rem', marginBottom: '6rem' }}>
-                {codeSections.map((section) => {
-                  const isOpen = openCodeSections[section.key] !== false;
-                  return (
-                    <div key={section.key} className="code-section">
-                      <div
-                        className="code-section-header"
-                        onClick={() => toggleCodeSection(section.key)}
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', padding: '0.6rem 1rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}
-                      >
-                        <span>{section.title}</span>
-                        <div className="code-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <button
-                            className="icon-button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleCodeSection(section.key);
-                            }}
-                            title={isOpen ? 'Collapse section' : 'Expand section'}
-                          >
-                            <FontAwesomeIcon icon={isOpen ? faMinus : faPlus} />
-                          </button>
-                          <button
-                            className="icon-button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              copyToClipboard(section.code);
-                              addNotification('Code copied!');
-                            }}
-                            title="Copy code to clipboard"
-                          >
-                            <FontAwesomeIcon icon={faCopy} />
-                          </button>
-                        </div>
-                      </div>
-                      {isOpen && (
-                        <pre style={{ margin: 0, maxHeight: '200px', overflow: 'auto', background: '#ffffff', padding: '0.5rem 1rem' }}>
-                          <code dangerouslySetInnerHTML={{ __html: highlight(section.code) }} />
-                        </pre>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      </main>
-      {/* Sliding Brand Customisation Panel */}
-      {showBrandPanel && (
-        <>
-          <div className={showBrandPanel ? 'black-overlay open' : 'black-overlay'} onClick={() => setShowBrandPanel(false)}></div>
-          <div className={showBrandPanel ? 'brand-panel open' : 'brand-panel'}>
-            <h2 style={{ fontSize: '1.2rem', marginTop: 0 }}>Brand Customisation</h2>
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem' }}>Font</label>
-              <select value={brandFont} onChange={(e) => setBrandFont(e.target.value)} style={{ width: '100%', padding: '0.5rem' }}>
-                <option value="">Default (Montserrat)</option>
-                <option value="Arial, Helvetica, sans-serif">Arial</option>
-                <option value="Georgia, serif">Georgia</option>
-                <option value="Times New Roman, serif">Times New Roman</option>
-                <option value="Courier New, monospace">Courier New</option>
-              </select>
             </div>
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem' }}>Primary Colour</label>
-              <input type="color" value={brandPrimary} onChange={(e) => setBrandPrimary(e.target.value)} style={{ width: '100%', height: '2rem', padding: 0, border: 'none' }} />
-            </div>
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem' }}>Secondary Colour</label>
-              <input type="color" value={brandSecondary} onChange={(e) => setBrandSecondary(e.target.value)} style={{ width: '100%', height: '2rem', padding: 0, border: 'none' }} />
-            </div>
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem' }}>Website URL</label>
-              <input
-                type="url"
-                value={brandWebsite}
-                onChange={(e) => setBrandWebsite(e.target.value)}
-                onBlur={(e) => setBrandWebsite(sanitizeUrl(e.currentTarget.value))}
-                placeholder="https://example.com"
-                style={{ width: '100%', padding: '0.5rem' }}
-              />
-            </div>
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem' }}>Company Logo</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files ? e.target.files[0] : null;
-                  setBrandLogo(file);
-                }}
-                style={{ width: '100%' }}
-              />
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button onClick={() => setShowBrandPanel(false)} style={{ padding: '0.5rem 1rem' }}>Close</button>
-              <button onClick={() => setShowBrandPanel(false)} style={{ padding: '0.5rem 1rem' }}>Save</button>
-            </div>
-          </div>
-        </>
-      )}
+      </AppLayout>
 
-      {/* Notification container */}
-      <div className="notifications-container">
-        {notifications.map((note) => (
-          <div key={note.id} className="notification">
-            {note.message}
-          </div>
-        ))}
-      </div>
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={3000}
+        onClose={() => setSnackbarOpen(false)}
+        message={snackbarMsg as any}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      />
     </>
   );
 }

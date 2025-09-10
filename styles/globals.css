@@ -18,6 +18,13 @@
   --radius-small: 6px;
   --shadow-light: 0 2px 4px rgba(0, 0, 0, 0.05);
   --shadow-medium: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --gap-2: 4px;
+  --pad-x: 12px; /* standard horizontal padding for toolbars/headers */
+  --pad-y: 8px;  /* standard vertical padding for toolbars/headers */
+  /* Central icon styling */
+  --icon-color: var(--color-primary);
+  --icon-color-hover: var(--color-primary-dark);
+  --icon-hover-bg: rgba(0,0,0,0.06);
 }
 
 html, body {
@@ -38,6 +45,19 @@ a {
   box-sizing: border-box;
 }
 
+/* Centralised icon color + hover */
+.MuiIconButton-root {
+  color: var(--icon-color);
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+.MuiIconButton-root:hover {
+  color: var(--icon-color-hover);
+  background-color: var(--icon-hover-bg);
+}
+.MuiSvgIcon-root {
+  color: inherit;
+}
+
 /*
   The page container now uses a two‑column layout: a left panel for
   editing controls (accordion sections) and a right panel for the
@@ -47,15 +67,11 @@ a {
   viewport width, giving the preview ample space on larger screens.
 */
 main {
-  /* Allow the main container to occupy the full viewport. The margin and
-     border radius have been removed so the editor spans the full width
-     and height. Padding provides internal spacing around the content. */
-  padding: 1.5rem;
-  width: calc(100%);
-  height: calc(100vh);
+  /* Content sits below fixed header; scrolling delegated to inner sections */
+  width: 100%;
+  height: 100vh;
   display: flex;
   flex-direction: column;
-  /* Prevent scrollbars in the main container */
   overflow: hidden;
 }
 
@@ -66,7 +82,7 @@ main {
    content overflows. */
 .page-container {
   display: flex;
-  gap: 2rem;
+  gap: var(--gap-2);
   height: 100%;
 }
 
@@ -93,11 +109,10 @@ main {
    footer). They are bordered and slightly elevated for distinction.
    Only one section is expanded at a time. */
 .accordion-section {
-  border: 1px solid #e5e7eb;
-  border-radius: var(--radius-small);
-  margin-bottom: 1rem;
   background-color: var(--color-surface);
-  box-shadow: var(--shadow-light);
+  transition: opacity 0.25s ease, outline-color 0.2s ease, box-shadow 0.2s ease;
+  outline: 1px solid transparent;
+  //border-radius: var(--radius-small);
 }
 
 /* Accordion headers are clickable and control the expansion of
@@ -107,20 +122,33 @@ main {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1rem;
+  padding: var(--pad-y) var(--pad-x);
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 500;
   border-bottom: 1px solid #e5e7eb;
   transition: background-color 0.2s;
 }
 .accordion-header:hover {
   background-color: #f9fafb;
 }
+.accordion-header.open {
+  background-color: #f9fafb;
+}
+/* Dim non-open sections when any is open */
+.accordion-section.open {
+  opacity: 1;
+  border: 1px solid var(--color-primary);
+}
+
+.accordion-list.has-open .accordion-section:not(.open) {
+  opacity: 1;
+}
 
 /* Accordion content holds the controls for each section. It has
    internal padding. */
 .accordion-content {
   padding: 1rem;
+  //border-bottom: 1px solid #e5e7eb;
 }
 
 /* Template row: holds the template selector and action icons. The
@@ -128,34 +156,11 @@ main {
 .template-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
+  gap: var(--gap-2);
 }
 .template-select {
   flex: 0 0 70%;
   min-width: 0;
-}
-
-/* Buttons rendered as bare icons. They are styled transparently and
-   highlight on hover. */
-.icon-button {
-  background-color: transparent;
-  color: var(--color-primary);
-  border: none;
-  cursor: pointer;
-  padding: 0.4rem;
-  font-size: 1.1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.2s;
-}
-.icon-button:hover {
-  color: var(--color-primary-dark);
-}
-.icon-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 /* New template form container. Hidden by default; shown when the
@@ -168,34 +173,10 @@ main {
 }
 .new-template-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--gap-2);
   justify-content: flex-end;
 }
 
-/* Preview bar at the top of the right panel. Contains the title and
-   icons to switch between preview and code modes as well as copy
-   functionality. */
-.preview-bar {
-  /* Fixed preview bar across the right panel. Position fixed so it stays
-     pinned at the top of the preview area. The width uses
-     -webkit-fill-available to span the available space. Center the
-     content and leave space on the right for icons. */
-  position: fixed;
-  width: -webkit-fill-available;
-  margin-right: 1.5rem;
-  text-align: center;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
-    background: var(--color-bg);
-    z-index: 1;
-    padding-bottom: 0.5rem;
-    padding-left: 70px;
-}
-.preview-bar h2{
-    font-weight: 300;
-}
 
 /* Code block container for the code view on the right panel. It
    ensures proper padding and scrolling of long code segments. */
@@ -220,12 +201,24 @@ main {
 }
 .code-section-header {
   background-color: #f9fafb;
-  padding: 0.6rem 1rem;
+  padding: var(--pad-y) var(--pad-x);
   display: flex;
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
   border-bottom: 1px solid #e5e7eb;
+}
+
+/* Preview toolbar at top of right panel */
+.preview-bar {
+    padding: calc(var(--pad-y) * 1.7) 24px;  
+    background-color: #ffffff;
+}
+/* Preview bar actions */
+.preview-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-2);
 }
 .code-section-header:hover {
   background-color: #f3f4f6;
@@ -233,7 +226,7 @@ main {
 .code-actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--gap-2);
 }
 .code-section pre {
   margin: 0;
@@ -348,152 +341,7 @@ label {
   font-weight: 500;
 }
 
-input[type="text"],
-input[type="url"],
-textarea,
-select {
-  width: 100%;
-  border: 1px solid #d1d5db;
-  border-radius: var(--radius-small);
-  padding: 0.5rem 0.75rem;
-  font-size: 0.95rem;
-  margin-bottom: 0.5rem;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
 
-input[type="text"]:focus,
-input[type="url"]:focus,
-textarea:focus,
-select:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-accent-light);
-}
-
-button {
-  background-color: var(--color-primary);
-  color: #ffffff;
-  border: none;
-  border-radius: var(--radius-small);
-  padding: 0.6rem 1.2rem;
-  font-size: 0.95rem;
-  cursor: pointer;
-  /* Only animate background colour; remove transform from the transition to prevent motion */
-  transition: background-color 0.2s;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 500;
-}
-
-button:hover:not(:disabled) {
-  /* On hover, only change the background colour; do not move the button */
-  background-color: var(--color-primary-dark);
-  color:#ffffff;
-}
-
-button:active:not(:disabled) {
-  /* Prevent any positional shift on active state */
-  transform: none;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-textarea[readonly] {
-  background-color: #f9fafb;
-  color: #444444;
-}
-
-/* Flex container for URL inputs */
-.url-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.url-row button {
-  background-color: transparent;
-  color: var(--color-primary);
-  padding: 0;
-  font-size: 1.2rem;
-  line-height: 1;
-}
-
-.url-row button:hover {
-  color: var(--color-primary-dark);
-}
-
-/* Toggle switch component */
-.toggle-switch {
-  position: relative;
-  display: inline-block;
-  width: 40px;
-  height: 20px;
-}
-.toggle-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-.toggle-switch .slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #d1d5db;
-  transition: 0.2s;
-  border-radius: 20px;
-}
-.toggle-switch .slider:before {
-  position: absolute;
-  content: "";
-  height: 16px;
-  width: 16px;
-  left: 2px;
-  bottom: 2px;
-  background-color: #ffffff;
-  transition: 0.2s;
-  border-radius: 50%;
-}
-.toggle-switch input:checked + .slider {
-  background-color: var(--color-primary);
-}
-.toggle-switch input:checked + .slider:before {
-  transform: translateX(20px);
-}
-
-/* Modern range slider */
-input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 60px;
-  height: 4px;
-  background: #d1d5db;
-  border-radius: 2px;
-  outline: none;
-}
-input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--color-primary);
-  cursor: pointer;
-}
-input[type="range"]::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--color-primary);
-  cursor: pointer;
-}
 /* Divider for adding new templates */
 .divider {
   border-top: 1px solid #e5e7eb;
@@ -583,7 +431,7 @@ input[type="range"]::-moz-range-thumb {
   overflow-y: auto;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--gap-2);
   justify-content: center;
 }
 

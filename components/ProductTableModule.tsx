@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
-import { ProductData } from './EditableModule';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import List from '@mui/material/List';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemText from '@mui/material/ListItemText';
+import { ProductData } from '../lib/types';
 import { uniqueImages, normalizeImage } from '../lib/imageUtils';
 
 interface ProductTableModuleProps {
@@ -7,12 +12,17 @@ interface ProductTableModuleProps {
   index: number;
   orientation: 'left-image' | 'right-image';
   updateProduct: (index: number, field: keyof ProductData, value: string) => void;
-  /** Optional bottom padding for the outer 600px table */
-  paddingBottom?: number;
   /** Callback when the module is interacted with */
   onActivate?: () => void;
   /** Background colour for the CTA button */
   ctaBg: string;
+  /** Ref to right-panel container to bound fixed overlay */
+  overlayContainerRef?: React.RefObject<HTMLElement>;
+  /** Per-product description source override */
+  descSource?: 'metadata' | 'p' | 'ul';
+  onChangeDescSource?: (source: 'metadata' | 'p' | 'ul') => void;
+  /** Brand name for fallback alt text */
+  brandName?: string;
 }
 
 const ProductTableModule: React.FC<ProductTableModuleProps> = ({
@@ -20,12 +30,16 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
   index,
   orientation,
   updateProduct,
-  paddingBottom,
   onActivate,
-  ctaBg
+  ctaBg,
+  overlayContainerRef,
+  descSource,
+  onChangeDescSource,
+  brandName
 }) => {
   // Modal state for the image selector
   const [showSelector, setShowSelector] = useState(false);
+  const [descDialogOpen, setDescDialogOpen] = useState(false);
 
   /**
    * Build the list of selectable thumbnails without mutating or duplicating
@@ -106,25 +120,80 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
         </span>
       </p>
 
-      {/* Description */}
-      <p
-        style={{
-          margin: '0 0 16px 0',
-          fontFamily: "'Montserrat',Arial,Helvetica,sans-serif",
-          fontSize: '14px',
-          lineHeight: '1.6',
-          color: '#333333',
-          whiteSpace: 'pre-wrap'
-        }}
-        contentEditable
-        suppressContentEditableWarning
-        onBlur={(e) => {
-          const text = e.currentTarget.innerText.replace(/\n$/, '');
-          updateProduct(index, 'description', text);
-        }}
-      >
-        {product.description || 'Description'}
-      </p>
+      {/* Description with per-product source selector */}
+      <div style={{ position: 'relative' }}>
+        {(descSource || 'metadata') === 'ul' && (product as any).descriptionUl ? (
+          <div
+            style={{
+              margin: '0 0 16px 0',
+              fontFamily: "'Montserrat',Arial,Helvetica,sans-serif",
+              fontSize: '14px',
+              lineHeight: '1.6',
+              color: '#333333'
+            }}
+            dangerouslySetInnerHTML={{ __html: (product as any).descriptionUl as any }}
+          />
+        ) : (
+          <p
+            style={{
+              margin: '0 0 16px 0',
+              fontFamily: "'Montserrat',Arial,Helvetica,sans-serif",
+              fontSize: '14px',
+              lineHeight: '1.6',
+              color: '#333333',
+              whiteSpace: 'pre-wrap'
+            }}
+            contentEditable
+            suppressContentEditableWarning
+            onBlur={(e) => {
+              const text = e.currentTarget.innerText.replace(/\n$/, '');
+              updateProduct(index, 'description', text);
+            }}
+          >
+            {((descSource || 'metadata') === 'p' && (product as any).descriptionP) ? (product as any).descriptionP : (product.description || 'Description')}
+          </p>
+        )}
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            setDescDialogOpen(true);
+          }}
+          style={{
+            position: 'absolute',
+            bottom: 8,
+            right: 8,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            color: '#ffffff',
+            borderRadius: '50%',
+            padding: 4,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer'
+          }}
+          title="Change description source"
+          aria-label="Change description source"
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M14.69 3.1l6.2 6.2c.27.27.27.7 0 .97l-8.2 8.2c-.17.17-.39.26-.62.26H6.5c-.55 0-1-.45-1-1v-5.57c0-.23.09-.45.26-.62l8.2-8.2c.27-.27.7-.27.97 0zM5 20h14v2H5v-2z" />
+          </svg>
+        </div>
+        <Dialog open={descDialogOpen} onClose={() => setDescDialogOpen(false)} onClick={(e) => e.stopPropagation()}>
+          <DialogTitle>Select description source</DialogTitle>
+          <List sx={{ pt: 0 }}>
+            {(['metadata','p','ul'] as const).map((opt) => (
+              <ListItemButton
+                key={opt}
+                onClick={() => { onChangeDescSource?.(opt); setDescDialogOpen(false); }}
+              >
+                <ListItemText
+                  primary={opt === 'metadata' ? 'Metadata' : opt === 'p' ? 'Description' : 'Bullet List'}
+                />
+              </ListItemButton>
+            ))}
+          </List>
+        </Dialog>
+      </div>
 
       {/* CTA + Colours row */}
       <table role="presentation" width="100%" cellPadding={0} cellSpacing={0} border={0} style={{ margin: 0, padding: 0 }}>
@@ -166,50 +235,7 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
             {/* Spacer */}
             <td width="12" style={{ fontSize: 0, lineHeight: 0 }}>&nbsp;</td>
 
-            {/* Colours (right) */}
-            <td align="right" valign="middle" style={{ padding: 0 }}>
-              {(() => {
-                const rawColours = Array.isArray(product.colors) ? product.colors : [];
-                const colours = rawColours
-                  .filter((c) => typeof c === 'string' && c.trim() && !/^(#?fff(?:fff)?|#?f7f7f7)$/i.test(c.trim()))
-                  .slice(0, 3);
-                if (colours.length === 0) return null;
-
-                const cells: JSX.Element[] = [];
-                colours.forEach((col, idx) => {
-                  cells.push(<td key={idx} width="24" height="24" style={{ background: col as string }} />);
-                  if (idx < colours.length - 1) cells.push(<td key={`spacer-${idx}`} width="8" />);
-                });
-                if (rawColours.length > colours.length) {
-                  if (cells.length > 0) cells.push(<td key="spacer-plus" width="8" />);
-                  cells.push(
-                    <td
-                      key="plus"
-                      width="24"
-                      height="24"
-                      style={{
-                        background: '#ffffff',
-                        textAlign: 'center',
-                        lineHeight: '24px',
-                        fontFamily: "'Montserrat',Arial,Helvetica,sans-serif",
-                        fontSize: '14px',
-                        color: '#333333'
-                      }}
-                    >
-                      +
-                    </td>
-                  );
-                }
-
-                return (
-                  <table role="presentation" cellPadding={0} cellSpacing={0} border={0} style={{ margin: 0, padding: 0 }}>
-                    <tbody>
-                      <tr>{cells}</tr>
-                    </tbody>
-                  </table>
-                );
-              })()}
-            </td>
+            {/* Colour swatches removed per requirements */}
           </tr>
         </tbody>
       </table>
@@ -224,7 +250,7 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
       >
         <img
           src={product.image}
-          alt={product.title}
+          alt={(product as any).imageAlt || product.title || brandName || ''}
           style={{
             display: 'block',
             width: '100%',
@@ -262,20 +288,20 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
         cellSpacing={0}
         border={0}
         align="center"
-        style={{ margin: '0', padding: '0', background: '#F7F7F7' }}
+        style={{ margin: '0', padding: '0' }}
         onClick={onActivate}
       >
         <tbody>
           {/* Main row */}
           <tr>
-            <td align="center" style={{ margin: 0, padding: 0, background: '#F7F7F7' }}>
+            <td align="center" style={{ margin: 0, padding: 0 }}>
               <table
                 role="presentation"
                 width="100%"
                 cellPadding={0}
                 cellSpacing={0}
                 border={0}
-                style={{ maxWidth: '600px', margin: '0 auto', background: '#FFFFFF', paddingBottom: paddingBottom ? `${paddingBottom}px` : undefined }}
+                style={{ maxWidth: '600px', margin: '0 auto', background: '#FFFFFF' }}
               >
                 <tbody>
                   <tr>
@@ -307,45 +333,28 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
         </tbody>
       </table>
       {/* Right-panel overlay selector */}
-      {showSelector && thumbs.length > 1 && (
-        <div
-          className="image-selector-overlay"
-          style={{ width: '100%' }}
-          onClick={closeSelector}
-        >
-          <div className="image-selector" onClick={(e) => e.stopPropagation()}>
-            {thumbs.map((img) => {
-              const isSelected = normalizeImage(img) === mainImage;
-              return (
-                <img
-                  key={img}
-                  src={img}
-                  alt=""
-                  style={{
-                    border: isSelected ? '2px solid #d19aa0' : '2px solid transparent',
-                    boxSizing: 'border-box'
-                  }}
-                  onClick={() => handleSelectImage(img)}
-                />
-              );
-            })}
-            <button
-              onClick={closeSelector}
-              style={{
-                marginTop: 0,
-                padding: '0.5rem 1rem',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer'
-              }}
-            >
-              Close
-            </button>
+      {showSelector && thumbs.length > 1 && (() => {
+        const rect = overlayContainerRef?.current?.getBoundingClientRect();
+        const overlayStyle: React.CSSProperties = rect ? {
+          position: 'fixed', left: rect.left, top: 0, width: rect.width, height: '100vh',
+          backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        } : { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 };
+        return (
+          <div onClick={closeSelector} style={overlayStyle}>
+            <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#fff', padding: '1rem', borderRadius: 8, maxWidth: '90%', maxHeight: '80%', overflowY: 'auto', display: 'flex', flexWrap: 'wrap', gap: 'var(--gap-2)', justifyContent: 'center' }}>
+              {thumbs.map((img) => {
+                const isSelected = normalizeImage(img) === mainImage;
+                return (
+                  <img key={img} src={img} alt="" style={{ border: isSelected ? '2px solid #d19aa0' : '2px solid transparent', boxSizing: 'border-box', width: 120, height: 120, objectFit: 'cover', borderRadius: 6 }} onClick={() => handleSelectImage(img)} />
+                );
+              })}
+              <button onClick={closeSelector} style={{ padding: '0.5rem 1rem', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Close</button>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </>
   );
 };
 
-export default ProductTableModule;
+export default React.memo(ProductTableModule);

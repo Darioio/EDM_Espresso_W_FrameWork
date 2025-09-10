@@ -16,9 +16,9 @@ export const defaultBannerTemplates: BannerTemplate[] = [
     id: 'banner-default',
     name: 'Default Banner',
     html: `<!-- === Start: Banner Section === -->
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0;padding:0;background:#F7F7F7;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0;padding:0;">
   <tr>
-    <td align="center" style="margin:0;padding:0;background:#F7F7F7;">
+    <td align="center" style="margin:0;padding:0;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;margin:0 auto;background:#FFFFFF;">
         <tr>
           <td style="padding:0;">

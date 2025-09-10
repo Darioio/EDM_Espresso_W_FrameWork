@@ -26,9 +26,9 @@ export const defaultFooterTemplates: FooterTemplate[] = [
     id: 'default-footer',
     name: 'Default Footer',
     html: `<!-- === BEGIN: Belle & Bloom Footer + Menu Module (Inline Styles Only) === -->
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0;padding:0;background:#F7F7F7;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0;padding:0;">
   <tr>
-    <td align="center" style="margin:0;padding:0;background:#F7F7F7;">
+    <td align="center" style="margin:0;padding:0;">
 
       <!-- Hidden preheader -->
       <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;line-height:1px;font-size:1px;color:#ffffff;">
