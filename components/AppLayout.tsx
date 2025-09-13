@@ -84,7 +84,7 @@ export default function AppLayout({ title = 'EDM Espresso', left, right, rightOp
         elevation={0}
         sx={{
           zIndex: (t) => t.zIndex.drawer + 1,
-          backgroundColor: '#f9fafb',
+          backgroundColor: '#F5F6FA',
           boxShadow: 'none',
           borderBottom: (t) => `1px solid ${t.palette.divider}`,
         }}
@@ -140,9 +140,9 @@ export default function AppLayout({ title = 'EDM Espresso', left, right, rightOp
         sx={{
           flexGrow: 1,
           width: { sm: `calc(100% - ${leftWidth}px)` },
+          paddingTop: '64px', // Push content below header
         }}
       >
-        <Toolbar />
         {children}
       </Box>
 

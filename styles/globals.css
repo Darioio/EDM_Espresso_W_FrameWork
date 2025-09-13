@@ -212,7 +212,7 @@ main {
 /* Preview toolbar at top of right panel */
 .preview-bar {
     padding: calc(var(--pad-y) * 1.7) 24px;  
-    background-color: #ffffff;
+    background-color: #f5f6fa;
 }
 /* Preview bar actions */
 .preview-actions {

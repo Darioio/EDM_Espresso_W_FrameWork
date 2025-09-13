@@ -38,7 +38,7 @@ export const defaultTemplates: Template[] = [
       <!-- Wrapper -->
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;margin:0 auto;background:#FFFFFF;">
         <tr>
-          <td style="padding:24px 16px;">
+          <td style="padding:25px">
             <!-- Two Columns -->
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:0;padding:0;">
               <tr>
@@ -119,6 +119,44 @@ export const defaultTemplates: Template[] = [
 </style>`
   }
   , {
+    id: 'grid',
+    name: 'Grid',
+    // Grid template: displays only product images in a responsive grid, no titles or descriptions.
+    html: `<!-- === Start: Product Grid Module === -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0;padding:0;">
+  <tr>
+    <td align="center" style="margin:0;padding:0;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;margin:0 auto;background:#FFFFFF;">
+        <tr>
+          <td style="padding:0px;">
+            <!-- Product Images Grid -->
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:0;padding:0;">
+              <tr>
+                {{#each images}}
+                <td align="center" valign="top" style="padding:0px;">
+                  <img src="{{.}}" alt="Product image" style="display:block;width:100%;height:auto;border:0;outline:0;text-decoration:none;-ms-interpolation-mode:bicubic;">
+                </td>
+                {{/each}}
+              </tr>
+            </table>
+            <!-- /Product Images Grid -->
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+<!-- === End: Product Grid Module === -->
+<style>
+@media only screen and (max-width: 600px) {
+  .product-grid-img {
+    width: 80px !important;
+    padding: 4px !important;
+  }
+}
+</style>`
+  }
+  , {
     id: 'product-copy-left-image-right',
     name: 'Copy left / Image right',
     // Swapped layout: copy appears on the left and image on the right. This
@@ -132,7 +170,7 @@ export const defaultTemplates: Template[] = [
       <!-- Wrapper -->
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;margin:0 auto;background:#FFFFFF;">
         <tr>
-          <td style="padding:24px 16px;">
+          <td style="padding:25px;">
             <!-- Two Columns -->
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:0;padding:0;">
               <tr>

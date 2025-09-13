@@ -145,26 +145,8 @@ export const defaultFooterTemplates: FooterTemplate[] = [
               <tr>
                 <td align="center" style="padding:0;margin:0;font-size:0;">
                   
-                  <!--[if mso]>
-                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                    <tr>
-                      <td align="center" width="150" style="padding:0 6px;">
-                        <img src="https://d3k81ch9hvuctc.cloudfront.net/company/Wu2wqB/images/1f3a26d0-9a18-4cbf-8043-a9814b06c75d.jpeg" width="150" alt="Footer image 1" style="display:block;height:auto;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;">
-                      </td>
-                      <td align="center" width="150" style="padding:0 6px;">
-                        <img src="https://d3k81ch9hvuctc.cloudfront.net/company/Wu2wqB/images/5826e529-cfa2-4c07-8418-b8d1dd703391.jpeg" width="150" alt="Footer image 2" style="display:block;height:auto;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;">
-                      </td>
-                      <td align="center" width="150" style="padding:0 6px;">
-                        <img src="https://d3k81ch9hvuctc.cloudfront.net/company/Wu2wqB/images/3929f73d-a329-44c6-a3da-f898aa9c80ab.jpeg" width="150" alt="Footer image 3" style="display:block;height:auto;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;">
-                      </td>
-                      <td align="center" width="150" style="padding:0 6px;">
-                        <img src="https://d3k81ch9hvuctc.cloudfront.net/company/Wu2wqB/images/ee153f13-a66b-4672-9f00-41829a6218d3.jpeg" width="150" alt="Footer image 4" style="display:block;height:auto;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;">
-                      </td>
-                    </tr>
-                  </table>
-                  <![endif]-->
+  
 
-                  <!--[if !mso]><!-- -->
                   <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-block;vertical-align:top;width:25%;max-width:150px;">
                     <tr>
                       <td align="center" style="padding-left:6px;padding-right:6px;">
@@ -196,7 +178,6 @@ export const defaultFooterTemplates: FooterTemplate[] = [
                       </td>
                     </tr>
                   </table>
-                  <!--<![endif]-->
 
                 </td>
               </tr>

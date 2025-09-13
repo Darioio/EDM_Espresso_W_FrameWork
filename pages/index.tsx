@@ -1,3 +1,10 @@
+  // ...existing code...
+
+// ...existing code...
+// ...existing code...
+
+  // ...existing code...
+  // Place this after bodySections and generateSection are defined
 import React, { useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import Head from 'next/head';
 import AppLayout from '../components/AppLayout';
@@ -9,6 +16,10 @@ import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import FormControl from '@mui/material/FormControl';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
 import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
@@ -23,7 +34,7 @@ import { MuiColorInput } from 'mui-color-input';
 import InputAdornment from '@mui/material/InputAdornment';
 // Removed padding controls
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-// import Backdrop from '@mui/material/Backdrop';
+import Backdrop from '@mui/material/Backdrop';
 import {
   defaultTemplates as defaultBodyTemplates,
   Template as BodyTemplate,
@@ -50,6 +61,7 @@ import { ProductData } from '../lib/types';
 // each product module with inline editing and image selection. The
 // HeroTableModule renders the hero section with image selection.
 import ProductTableModule from '../components/ProductTableModule';
+import { ImageSelector } from '../components/shared/ImageSelector';
 import HeroTableModule from '../components/HeroTableModule';
 // ProductTableModule was used for an interactive preview in earlier versions. When
 // rendering via Option A the preview uses the compiled HTML directly so we
@@ -84,6 +96,7 @@ import {
 } from '@dnd-kit/sortable';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { CSS } from '@dnd-kit/utilities';
+import HtmlThumbnail from '../components/shared/HtmlThumbnail';
 // PrismJS is loaded dynamically on the client. We avoid importing it at
 // the top level because that can cause issues with server‑side
 // rendering in Next.js. Instead we load it in a useEffect hook and
@@ -135,6 +148,8 @@ interface BodySection {
 }
 
 export default function Home() {
+  // Universal image selector state: which section and product index is open
+  const [imageSelector, setImageSelector] = useState<{ sectionId: number; productIdx: number } | null>(null);
   /**
    * Currently selected module section. Users can switch between
    * editing the header, body or footer. Default to the body
@@ -175,22 +190,7 @@ export default function Home() {
    * can be independently generated. A loading flag is stored per
    * section.
    */
-  const [bodySections, setBodySections] = useState<BodySection[]>([
-    {
-      id: 1,
-      name: 'Body 1',
-      urls: [
-        'https://www.belleandbloom.com/products/mad-about-you-floral-print-mini-dress-white-blue',
-        'https://www.belleandbloom.com/products/wanderlace-ruffle-maxi-skirt-white',
-        'https://www.belleandbloom.com/products/lost-found-knitted-sweater-camel',
-        ''
-      ],
-      products: [],
-      selectedBodyId: defaultBodyTemplates[0].id,
-      loading: false,
-      descriptionSource: 'metadata'
-    }
-  ]);
+  const [bodySections, setBodySections] = useState<BodySection[]>([]);
 
   // Draft URLs per section id; keeps typing local without re-rendering main compose
   const [draftUrls, setDraftUrls] = useState<Record<number, string[]>>({});
@@ -210,7 +210,7 @@ export default function Home() {
   const [showHeroSection, setShowHeroSection] = useState(true);
   const [showBannerSection, setShowBannerSection] = useState(true);
   const [showFooterSection, setShowFooterSection] = useState(true);
-  // Order of draggable sections excluding header/footer
+  // Order of draggable sections including header/footer
   const [sectionOrder, setSectionOrder] = useState<string[]>([
     'hero',
     ...bodySections.map((s) => `body-${s.id}`),
@@ -372,8 +372,12 @@ export default function Home() {
                     id={`url-${section.id}-${index}`}
                     type="url"
                     label={`Product URL ${index + 1}`}
-                    defaultValue={url}
+                    value={url}
                     fullWidth
+                    onChange={(e) => {
+                      const cleaned = sanitizeUrl(e.currentTarget.value);
+                      handleUrlChange(section.id, index, cleaned);
+                    }}
                     onBlur={(e) => {
                       const cleaned = sanitizeUrl(e.currentTarget.value);
                       handleUrlChange(section.id, index, cleaned);
@@ -389,15 +393,21 @@ export default function Home() {
                     }}
                     inputProps={{
                       onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
+                        const curr = e.currentTarget as HTMLInputElement;
+                        const value = curr.value.trim();
+                        const listLen = getDraftUrls(section.id).length;
                         if (e.key === 'Enter') {
                           e.preventDefault();
-                          const curr = (e.currentTarget as HTMLInputElement);
-                          const value = curr.value.trim();
-                          const listLen = getDraftUrls(section.id).length;
                           if (value && index === listLen - 1) {
                             addUrlField(section.id, index + 1);
                           }
                           curr.blur();
+                        } else if (e.key === 'Tab' && !e.shiftKey && index === listLen - 1) {
+                          // Tab on last field: accept value, add new field, and focus it
+                          e.preventDefault();
+                          const cleaned = sanitizeUrl(value);
+                          handleUrlChange(section.id, index, cleaned);
+                          addUrlField(section.id, index + 1);
                         }
                       }
                     }}
@@ -406,8 +416,19 @@ export default function Home() {
               ))}
             </div>
             <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: 'var(--gap-2)' }}>
-              <Button onClick={() => generateSection(section.id)} disabled={section.loading}>
+              <Button
+                onClick={() => {
+                  if (document.activeElement instanceof HTMLElement) {
+                    document.activeElement.blur();
+                  }
+                  setTimeout(() => generateSection(section.id), 0);
+                }}
+                disabled={section.loading}
+              >
                 {section.loading ? 'Generating…' : 'Update'}
+              </Button>
+              <Button variant="outlined" onClick={() => addUrlField(section.id, getDraftUrls(section.id).length)}>
+                Add URL
               </Button>
             </div>
             {/* Bottom padding controls removed */}
@@ -765,7 +786,7 @@ const [finalHtml, setFinalHtml] = useState('');
    * for future extension.
    */
   const [showBrandPanel, setShowBrandPanel] = useState(false);
-  const [brandName, setBrandName] = useState('belle and bloom');
+  const [brandName, setBrandName] = useState('');
   // Top loading bar (buffer variant)
   const [progress, setProgress] = useState<number>(-1);
   const [buffer, setBuffer] = useState<number>(-1);
@@ -773,7 +794,49 @@ const [finalHtml, setFinalHtml] = useState('');
   const [brandFont, setBrandFont] = useState('');
   const [brandPrimary, setBrandPrimary] = useState('#d19aa0');
   const [brandSecondary, setBrandSecondary] = useState('#F0C3C7');
-  const [brandWebsite, setBrandWebsite] = useState('https://www.belleandbloom.com/');
+  const [brandWebsite, setBrandWebsite] = useState('');
+
+  // Show a dialog to prompt for a product URL on first load
+  const [showBrandUrlDialog, setShowBrandUrlDialog] = useState(true);
+  const [brandUrlInput, setBrandUrlInput] = useState('');
+  // When the user submits a product URL, initialize the first body section with that URL
+  useEffect(() => {
+    if (brandWebsite && bodySections.length === 0 && brandUrlInput) {
+      setBodySections([
+        {
+          id: 1,
+          name: 'Body 1',
+          urls: [brandUrlInput],
+          products: [],
+          selectedBodyId: defaultBodyTemplates[0].id,
+          loading: false,
+          descriptionSource: 'metadata'
+        }
+      ]);
+    }
+  }, [brandWebsite, brandUrlInput]);
+
+  // Helper to extract base domain from a product URL
+  function extractBaseDomain(url: string): string {
+    try {
+      const u = new URL(url);
+      return u.origin;
+    } catch {
+      return '';
+    }
+  }
+
+  // Helper to extract a readable brand name from a domain
+  function extractBrandName(url: string): string {
+    try {
+      const u = new URL(url);
+      const host = u.hostname.replace(/^www\./, '');
+      const parts = host.split('.');
+      return parts.length > 1 ? parts[0].replace(/-/g, ' ') : host;
+    } catch {
+      return '';
+    }
+  }
   const [brandLogo, setBrandLogo] = useState<File | null>(null);
 
   /** Notifications for user feedback. Each notification has a unique id
@@ -796,9 +859,12 @@ const [finalHtml, setFinalHtml] = useState('');
    * in the state it is treated as open by default. Calling this
    * toggles the current value.
    */
-  const toggleCodeSection = (key: string) => {
-    setOpenCodeSections((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
+const toggleCodeSection = (key: string) => {
+  setOpenCodeSections((prev) => {
+    const isOpen = prev[key] !== false; // default open if not false
+    return { ...prev, [key]: !isOpen };
+  });
+};
 
   /**
    * Add a notification message. The notification will persist for a
@@ -816,6 +882,25 @@ const [finalHtml, setFinalHtml] = useState('');
    * selected the FileReader API is used to convert it into a base64
    * string. If no file is selected the data URI is reset to empty.
    */
+
+  // On first load, if no brandWebsite, show dialog
+  useEffect(() => {
+    if (!brandWebsite) {
+      setShowBrandUrlDialog(true);
+    }
+  }, [brandWebsite]);
+
+  // When user submits a URL, set brandWebsite and brandName
+  const handleBrandUrlSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const base = extractBaseDomain(brandUrlInput);
+    if (base) {
+      setBrandWebsite(base);
+      setBrandName(extractBrandName(brandUrlInput));
+      setShowBrandUrlDialog(false);
+    }
+  };
+
   useEffect(() => {
     if (brandLogo) {
       const reader = new FileReader();
@@ -1346,9 +1431,10 @@ const [finalHtml, setFinalHtml] = useState('');
   }, [bodySections, selectedBodyId, selectedHeaderId, selectedFooterId, selectedBannerId, bodyTemplates, headerTemplates, footerTemplates, bannerTemplates, brandPrimary, brandSecondary, brandFont, brandLogoDataUrl, heroImage, heroAlt, heroHref, bannerImage, bannerAlt, bannerHref, selectedHeroId, heroTemplates, showHeaderSection, showHeroSection, showBannerSection, showFooterSection, sectionOrder]);
 
   /**
-   * PrismJS reference and load state. We load Prism only on the client
-   * to avoid issues with server‑side rendering. When loaded, we save the
-   * module on a ref so that the highlight function can access it.
+   * PrismJS reference and load state. We load Prism only on the client. We also load the markup
+   * language component. Once loaded, we update the state to trigger
+   * re-render so syntax highlighting applies. The eslint comment
+   * suppresses warnings about asynchronous functions inside useEffect.
    */
   const prismRef = useRef<any>(null);
   const [prismLoaded, setPrismLoaded] = useState(false);
@@ -1482,7 +1568,15 @@ const [finalHtml, setFinalHtml] = useState('');
         if (storedFooter) {
           const parsedFooter: FooterTemplate[] = JSON.parse(storedFooter);
           if (Array.isArray(parsedFooter) && parsedFooter.length) {
-            setFooterTemplates((prev) => [...prev, ...parsedFooter]);
+            setFooterTemplates((prev) => {
+              const all = [...prev, ...parsedFooter];
+              const seen = new Set();
+              return all.filter(tpl => {
+                if (seen.has(tpl.id)) return false;
+                seen.add(tpl.id);
+                return true;
+              });
+            });
           }
         }
         // Banner templates
@@ -1726,14 +1820,17 @@ const [finalHtml, setFinalHtml] = useState('');
   const generateSection = async (sectionId: number) => {
     const section = bodySections.find((s) => s.id === sectionId);
     if (!section) return;
+    // Always use the latest draftUrls for this section
     const filtered = (draftUrls[sectionId] ?? section.urls).map((u) => u.trim()).filter((u) => u);
     if (filtered.length === 0) {
       alert('Please provide at least one product URL.');
       return;
     }
-    // Set loading true for this section and clear previous products
+    // Save the latest URLs to the section immediately so preview updates on first click
     setBodySections((prev) =>
-      prev.map((s) => (s.id === sectionId ? { ...s, loading: true, products: [] } : s))
+      prev.map((s) =>
+        s.id === sectionId ? { ...s, urls: [...filtered], loading: true, products: [] } : s
+      )
     );
     try {
       // Start loading bar immediately
@@ -1809,8 +1906,8 @@ const [finalHtml, setFinalHtml] = useState('');
         setBuffer(-1);
       }, 200);
     } catch (error: any) {
-      console.error('Generation failed', error);
-      alert(`Failed to generate products: ${error.message}`);
+  console.error('Generation failed', error);
+  console.log(`Failed to generate products: ${error.message}`);
       setBodySections((prev) =>
         prev.map((s) => (s.id === sectionId ? { ...s, loading: false } : s))
       );
@@ -1820,6 +1917,17 @@ const [finalHtml, setFinalHtml] = useState('');
       setBuffer(-1);
     }
   };
+  // Automatically generate the first body section when it is created (after user submits product URL)
+  useEffect(() => {
+    if (
+      bodySections.length === 1 &&
+      bodySections[0].products.length === 0 &&
+      bodySections[0].urls[0] &&
+      !bodySections[0].loading
+    ) {
+      generateSection(bodySections[0].id);
+    }
+  }, [bodySections]);
 
   // Fetch initial product data for the first body section on page load
   useEffect(() => {
@@ -1915,6 +2023,28 @@ const [finalHtml, setFinalHtml] = useState('');
 
   // Top heading moved into AppBar via AppLayout
 
+  if (!brandWebsite) {
+    // Show a simple dialog to prompt for a product URL
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#fafbfc' }}>
+        <form onSubmit={handleBrandUrlSubmit} style={{ background: '#fff', padding: 32, borderRadius: 8, boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
+          <h2 style={{ marginBottom: 16 }}>Enter a product URL to get started</h2>
+          <input
+            type="url"
+            value={brandUrlInput}
+            onChange={e => setBrandUrlInput(e.target.value)}
+            placeholder="https://yourstore.com/products/example"
+            style={{ width: 360, padding: 8, fontSize: 16, borderRadius: 4, border: '1px solid #ccc', marginBottom: 16 }}
+            required
+          />
+          <div style={{ textAlign: 'right' }}>
+            <button type="submit" style={{ padding: '8px 20px', fontSize: 16, borderRadius: 4, background: '#d19aa0', color: '#fff', border: 'none', cursor: 'pointer' }}>Continue</button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <>
       <Head>
@@ -1956,53 +2086,65 @@ const [finalHtml, setFinalHtml] = useState('');
                 </div>
                 {openSection === 'header' && (
                   <div className="accordion-content">
-                  {/* Hero template selector label */}
-                  <div className="template-row" style={{ display: 'flex', gap: 'var(--gap-2)', alignItems: 'center' }}>
-                    <FormControl fullWidth variant="outlined">
-                      <InputLabel id="header-template-label">Template</InputLabel>
-                      <Select labelId="header-template-label" id="header-template-select" label="Template" value={selectedHeaderId} onChange={(e) => setSelectedHeaderId(e.target.value)}>
-                        {headerTemplates.map((tpl) => (
-                          <MenuItem key={tpl.id} value={tpl.id}>{tpl.name}</MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                    <IconButton onClick={() => setHeaderEditMode((v) => !v)} title={headerEditMode ? 'Close editor' : 'Edit template'}>
-                      <EditIcon fontSize="medium" />
-                    </IconButton>
-                    <IconButton onClick={() => setShowNewHeader((v) => !v)} title={showNewHeader ? 'Cancel new template' : 'Add new template'}>
-                      <AddIcon fontSize="medium" />
-                    </IconButton>
+                    {/* Render only the active header template thumbnail */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+                      {(() => {
+                        const activeTpl = headerTemplates.find(tpl => tpl.id === selectedHeaderId);
+                        if (!activeTpl) return null;
+                        return (
+                          <div key={activeTpl.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <HtmlThumbnail html={activeTpl.html} width={600} forceAutoHeight />
+                          </div>
+                        );
+                      })()}
+                    </div>
+                    {/* Template selector row - moved below thumbnails */}
+                    <div className="template-row" style={{ display: 'flex', gap: 'var(--gap-2)', alignItems: 'center', marginTop: '1rem' }}>
+                      <FormControl fullWidth variant="outlined">
+                        <InputLabel id="header-template-label">Template</InputLabel>
+                        <Select labelId="header-template-label" id="header-template-select" label="Template" value={selectedHeaderId} onChange={(e) => setSelectedHeaderId(e.target.value)}>
+                          {headerTemplates.map((tpl) => (
+                            <MenuItem key={tpl.id} value={tpl.id}>{tpl.name}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      <IconButton onClick={() => setHeaderEditMode((v) => !v)} title={headerEditMode ? 'Close editor' : 'Edit template'}>
+                        <EditIcon fontSize="medium" />
+                      </IconButton>
+                      <IconButton onClick={() => setShowNewHeader((v) => !v)} title={showNewHeader ? 'Cancel new template' : 'Add new template'}>
+                        <AddIcon fontSize="medium" />
+                      </IconButton>
+                    </div>
+                    {headerEditMode && (
+                      <div>
+                        <TextField id="header-draft-html" label="Template HTML" value={draftHeaderHtml} onChange={(e) => setDraftHeaderHtml(e.target.value)} rows={8} fullWidth multiline sx={{ fontFamily: 'monospace' }} />
+                        <div className="new-template-actions" style={{ display: 'flex', gap: 'var(--gap-2)', marginTop: '0.5rem' }}>
+                          <IconButton onClick={() => setHeaderEditMode(false)} title="Cancel edit">
+                            <CloseIcon2 fontSize="medium" />
+                          </IconButton>
+                          <IconButton onClick={() => { saveHeaderEdits(); setHeaderEditMode(false); }} title="Save edits">
+                            <SaveIcon fontSize="medium" />
+                          </IconButton>
+                        </div>
+                      </div>
+                    )}
+                    {showNewHeader && (
+                      <div className="new-template-form">
+                        <TextField id="header-new-name" label="Template name" type="text" value={newHeaderName} onChange={(e) => setNewHeaderName(e.target.value)} fullWidth sx={{ mb: 1 }} />
+                        <TextField id="header-new-html" label="Template HTML" value={newHeaderHtml} onChange={(e) => setNewHeaderHtml(e.target.value)} rows={6} fullWidth multiline sx={{ fontFamily: 'monospace' }} />
+                        <div className="new-template-actions" style={{ display: 'flex', gap: 'var(--gap-2)', marginTop: '0.5rem' }}>
+                          <IconButton onClick={() => { setShowNewHeader(false); setNewHeaderName(''); setNewHeaderHtml(''); }} title="Cancel new template">
+                            <CloseIcon2 fontSize="medium" />
+                          </IconButton>
+                          <IconButton onClick={() => { addNewHeaderTemplate(); setShowNewHeader(false); }} title="Save new template">
+                            <SaveIcon fontSize="medium" />
+                          </IconButton>
+                        </div>
+                      </div>
+                    )}
+                    {/* Header bottom padding controls removed */}
                   </div>
-                  {headerEditMode && (
-                    <div>
-                      <TextField id="header-draft-html" label="Template HTML" value={draftHeaderHtml} onChange={(e) => setDraftHeaderHtml(e.target.value)} rows={8} fullWidth multiline sx={{ fontFamily: 'monospace' }} />
-                      <div className="new-template-actions" style={{ display: 'flex', gap: 'var(--gap-2)', marginTop: '0.5rem' }}>
-                        <IconButton onClick={() => setHeaderEditMode(false)} title="Cancel edit">
-                          <CloseIcon2 fontSize="medium" />
-                        </IconButton>
-                        <IconButton onClick={() => { saveHeaderEdits(); setHeaderEditMode(false); }} title="Save edits">
-                          <SaveIcon fontSize="medium" />
-                        </IconButton>
-                      </div>
-                    </div>
-                  )}
-                  {showNewHeader && (
-                    <div className="new-template-form">
-                      <TextField id="header-new-name" label="Template name" type="text" value={newHeaderName} onChange={(e) => setNewHeaderName(e.target.value)} fullWidth sx={{ mb: 1 }} />
-                      <TextField id="header-new-html" label="Template HTML" value={newHeaderHtml} onChange={(e) => setNewHeaderHtml(e.target.value)} rows={6} fullWidth multiline sx={{ fontFamily: 'monospace' }} />
-                      <div className="new-template-actions" style={{ display: 'flex', gap: 'var(--gap-2)', marginTop: '0.5rem' }}>
-                        <IconButton onClick={() => { setShowNewHeader(false); setNewHeaderName(''); setNewHeaderHtml(''); }} title="Cancel new template">
-                          <CloseIcon2 fontSize="medium" />
-                        </IconButton>
-                        <IconButton onClick={() => { addNewHeaderTemplate(); setShowNewHeader(false); }} title="Save new template">
-                          <SaveIcon fontSize="medium" />
-                        </IconButton>
-                      </div>
-                    </div>
-                  )}
-                  {/* Header bottom padding controls removed */}
-                </div>
-              )}
+                )}
               </div>
               )}
             {/* Draggable sections (hero, body, banner) */}
@@ -2053,7 +2195,20 @@ const [finalHtml, setFinalHtml] = useState('');
                 </div>
                 {openSection === 'footer' && (
                   <div className="accordion-content">
-                  <div className="template-row" style={{ display: 'flex', gap: 'var(--gap-2)', alignItems: 'center' }}>
+                  {/* Render only the active footer template thumbnail */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+                    {(() => {
+                      const activeTpl = footerTemplates.find(tpl => tpl.id === selectedFooterId);
+                      if (!activeTpl) return null;
+                      return (
+                        <div key={activeTpl.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <HtmlThumbnail html={activeTpl.html} width={600} forceAutoHeight />
+                        </div>
+                      );
+                    })()}
+                  </div>
+                  {/* Template selector row - moved below thumbnails */}
+                  <div className="template-row" style={{ display: 'flex', gap: 'var(--gap-2)', alignItems: 'center', marginTop: '1rem' }}>
                     <FormControl fullWidth variant="outlined">
                       <InputLabel id="footer-template-label">Template</InputLabel>
                       <Select labelId="footer-template-label" id="footer-template-select" label="Template" value={selectedFooterId}  onChange={(e) => setSelectedFooterId(e.target.value)}>
@@ -2225,8 +2380,13 @@ const [finalHtml, setFinalHtml] = useState('');
             {/* Global top progress when any section loading */}
             {/* Top progress is now handled by AppLayout's LinearProgress; remove page-level skeleton */}
             <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)' }}>
-              <div className="preview-bar" style={{ display: 'flex', alignItems: 'center', gap: 'var(--gap-2)', borderBottom: '1px solid #e5e7eb' }}>
-                <Typography variant="h6" sx={{ flex: 1 }}>{viewMode === 'preview' ? 'Email Preview' : 'Email Code'}</Typography>
+              <div className="preview-bar" style={{ display: 'flex', alignItems: 'center', gap: 'var(--gap-2)' }}>
+                <Typography
+                  variant="h6"
+                  sx={{ flex: 1, fontSize: '0.9rem', fontWeight: 400 }}
+                >
+                  {viewMode === 'preview' ? 'Email Preview' : 'Email Code'}
+                </Typography>
                 <div className="preview-actions">
                   <IconButton onClick={() => setViewMode(viewMode === 'preview' ? 'code' : 'preview')} title={viewMode === 'preview' ? 'Show code' : 'Show preview'}>
                     {viewMode === 'preview' ? <CodeIcon /> : <VisibilityIcon />}
@@ -2236,7 +2396,7 @@ const [finalHtml, setFinalHtml] = useState('');
                   </IconButton>
                 </div>
               </div>
-              <div style={{ overflowY: 'auto', overflowX: 'hidden', paddingBottom: '6rem', position: 'relative' }}>
+              <div style={{ overflowY: 'auto', overflowX: 'hidden', padding: '1rem', paddingTop: '0', position: 'relative' }}>
                 {viewMode === 'preview' ? (
                   <div ref={previewRef} data-preview-container="true">
                     {showHeaderSection && (
@@ -2308,38 +2468,138 @@ const [finalHtml, setFinalHtml] = useState('');
                                 )}
                               </>
                             )}
-                            {section.products.map((prod, idx) => {
-                          let orientation: 'left-image' | 'right-image';
-                          if (section.selectedBodyId === 'product-image-left-copy-right') {
-                            orientation = idx % 2 === 0 ? 'left-image' : 'right-image';
-                          } else {
-                            orientation = idx % 2 === 0 ? 'right-image' : 'left-image';
-                          }
-                          // Choose description source for preview (per-product)
-                          const dsPrev = (prod as any).descSource || 'metadata';
-                          let chosenDescription = (prod as any).description || '';
-                          if (dsPrev === 'p' && (prod as any).descriptionP) {
-                            chosenDescription = (prod as any).descriptionP as string;
-                          } else if (dsPrev === 'ul' && (prod as any).descriptionUl) {
-                            chosenDescription = (prod as any).descriptionUl as string;
-                          }
-                          return (
-                            <ProductTableModule
-                              key={`${section.id}-${idx}`}
-                              product={{ ...prod, description: chosenDescription }}
-                              index={idx}
-                              orientation={orientation}
-                              updateProduct={(i, field, value) => updateProductInSection(section.id, i, field, value)}
-                              
-                              onActivate={() => setOpenSection(`body-${section.id}`)}
-                              ctaBg={brandPrimary}
-                              overlayContainerRef={previewRef as any}
-                              brandName={brandName}
-                              descSource={(prod as any).descSource as any}
-                              onChangeDescSource={(src) => updateProductInSection(section.id, idx, 'descSource' as any, src)}
-                            />
-                          );
-                        })}
+                            {section.selectedBodyId === 'grid' ? (
+                              (() => {
+                                const tpl = bodyTemplates.find((t) => t.id === 'grid');
+                                if (!tpl) return null;
+                                // Render grid with clickable images
+                                // Use the same table structure as the actual grid template
+                                return (
+                                  <>
+                                    <table role="presentation" width="100%" cellPadding={0} cellSpacing={0} border={0} align="center" style={{ margin: 0, padding: 0 }}>
+                                      <tbody>
+                                        <tr>
+                                          <td align="center" style={{ margin: 0, padding: 0 }}>
+                                            <table role="presentation" width="100%" cellPadding={0} cellSpacing={0} border={0} style={{ maxWidth: 600, margin: '0 auto', background: '#FFFFFF' }}>
+                                              <tbody>
+                                                <tr>
+                                                  <td style={{ padding: 0 }}>
+                                                    <table role="presentation" width="100%" cellPadding={0} cellSpacing={0} border={0} style={{ width: '100%', margin: 0, padding: 0 }}>
+                                                      <tbody>
+                                                        <tr>
+                                                          {section.products.map((prod, idx) => (
+                                                            <td key={idx} align="center" valign="top" style={{ padding: 0, position: 'relative', cursor: 'pointer', overflow: 'hidden' }}
+                                                                onClick={() => setImageSelector({ sectionId: section.id, productIdx: idx })}
+                                                                onMouseEnter={e => {
+                                                                  const img = e.currentTarget.querySelector('img');
+                                                                  const icon = e.currentTarget.querySelector('.edit-icon') as HTMLElement;
+                                                                  if (img) img.style.opacity = '0.7';
+                                                                  if (icon) icon.style.transform = 'translateY(-38px)';
+                                                                }}
+                                                                onMouseLeave={e => {
+                                                                  const img = e.currentTarget.querySelector('img');
+                                                                  const icon = e.currentTarget.querySelector('.edit-icon') as HTMLElement;
+                                                                  if (img) img.style.opacity = '1';
+                                                                  if (icon) icon.style.transform = 'translateY(0)';
+                                                                }}
+                                                            >
+                                                              <img
+                                                                src={prod.image}
+                                                                alt={prod.title || ''}
+                                                                style={{ display: 'block', width: '100%', height: 'auto', border: 0, outline: 0, textDecoration: 'none', transition: 'opacity 0.2s ease-in-out' }}
+                                                              />
+                                                              {/* Edit icon overlay; only show if there are additional images. */}
+                                                              {prod.images && prod.images.length > 1 && (
+                                                                <div
+                                                                  className="edit-icon"
+                                                                  style={{
+                                                                    position: 'absolute',
+                                                                    bottom: -30,
+                                                                    right: 8,
+                                                                    backgroundColor: 'rgba(0,0,0,0.5)',
+                                                                    color: '#ffffff',
+                                                                    borderRadius: '50%',
+                                                                    padding: 4,
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    cursor: 'pointer',
+                                                                    transform: 'translateY(0)',
+                                                                    transition: 'transform 0.3s ease-in-out'
+                                                                  }}
+                                                                  onClick={e => { e.stopPropagation(); setImageSelector({ sectionId: section.id, productIdx: idx }); }}
+                                                                >
+                                                                  <EditIcon style={{ color: '#fff', fontSize: 16 }} />
+                                                                </div>
+                                                              )}
+                                                            </td>
+                                                          ))}
+                                                        </tr>
+                                                      </tbody>
+                                                    </table>
+                                                  </td>
+                                                </tr>
+                                              </tbody>
+                                            </table>
+                                          </td>
+                                        </tr>
+                                      </tbody>
+                                    </table>
+                                    {/* Universal ImageSelector for grid */}
+                                    {imageSelector && imageSelector.sectionId === section.id && section.products[imageSelector.productIdx] && (() => {
+                                      // Limit backdrop to main area
+                                      const mainPanel = typeof window !== 'undefined' ? document.querySelector('main') as HTMLElement : null;
+                                      const rect = mainPanel?.getBoundingClientRect() || undefined;
+                                      return (
+                                        <ImageSelector
+                                          images={section.products[imageSelector.productIdx].images || []}
+                                          selected={section.products[imageSelector.productIdx].image}
+                                          open={true}
+                                          onSelect={(img) => {
+                                            updateProductInSection(section.id, imageSelector.productIdx, 'image', img);
+                                            setImageSelector(null);
+                                          }}
+                                          onClose={() => setImageSelector(null)}
+                                          anchorRect={rect}
+                                        />
+                                      );
+                                    })()}
+                                  </>
+                                );
+                              })()
+                            ) : (
+                              section.products.map((prod, idx) => {
+                                let orientation: 'left-image' | 'right-image';
+                                if (section.selectedBodyId === 'product-image-left-copy-right') {
+                                  orientation = idx % 2 === 0 ? 'left-image' : 'right-image';
+                                } else {
+                                  orientation = idx % 2 === 0 ? 'right-image' : 'left-image';
+                                }
+                                // Choose description source for preview (per-product)
+                                const dsPrev = (prod as any).descSource || 'metadata';
+                                let chosenDescription = (prod as any).description || '';
+                                if (dsPrev === 'p' && (prod as any).descriptionP) {
+                                  chosenDescription = (prod as any).descriptionP as string;
+                                } else if (dsPrev === 'ul' && (prod as any).descriptionUl) {
+                                  chosenDescription = (prod as any).descriptionUl as string;
+                                }
+                                return (
+                                  <ProductTableModule
+                                    key={`${section.id}-${idx}`}
+                                    product={{ ...prod, description: chosenDescription }}
+                                    index={idx}
+                                    orientation={orientation}
+                                    updateProduct={(i, field, value) => updateProductInSection(section.id, i, field, value)}
+                                    onActivate={() => setOpenSection(`body-${section.id}`)}
+                                    ctaBg={brandPrimary}
+                                    overlayContainerRef={previewRef as any}
+                                    brandName={brandName}
+                                    descSource={(prod as any).descSource as any}
+                                    onChangeDescSource={(src) => updateProductInSection(section.id, idx, 'descSource' as any, src)}
+                                  />
+                                );
+                              })
+                            )}
                           </div>
                         );
                       }

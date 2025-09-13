@@ -1,5 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { uniqueImages } from '../lib/imageUtils';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import ImageList from '@mui/material/ImageList';
+import ImageListItem from '@mui/material/ImageListItem';
+import Button from '@mui/material/Button';
+import Backdrop from '@mui/material/Backdrop';
 
 interface HeroTableModuleProps {
   /** Selected hero image URL */
@@ -32,6 +40,7 @@ interface HeroTableModuleProps {
  * markup used in the email template so the preview closely
  * matches the final generated HTML.
  */
+
 const HeroTableModule: React.FC<HeroTableModuleProps> = ({
   heroImage,
   heroAlt,
@@ -41,13 +50,25 @@ const HeroTableModule: React.FC<HeroTableModuleProps> = ({
   templateId,
   onActivate
 }) => {
-  // Local state controlling the visibility of the image selector
-  // overlay. When true the modal covers the right panel and shows
-  // all available hero images. Selecting an image or clicking
-  // outside the modal closes it.
   const [showSelector, setShowSelector] = useState(false);
-
+  const [mainRect, setMainRect] = useState<DOMRect | null>(null);
   const availableImages = uniqueImages(heroImages);
+
+  useEffect(() => {
+    const updateRect = () => {
+      const mainPanel = document.querySelector('main') as HTMLElement;
+      if (mainPanel) {
+        setMainRect(mainPanel.getBoundingClientRect());
+      }
+    };
+    if (showSelector) {
+      updateRect();
+      window.addEventListener('resize', updateRect);
+      return () => {
+        window.removeEventListener('resize', updateRect);
+      };
+    }
+  }, [showSelector]);
 
   const openSelector = () => {
     if (availableImages.length > 0) {
@@ -62,155 +83,173 @@ const HeroTableModule: React.FC<HeroTableModuleProps> = ({
     setShowSelector(false);
   };
 
+  // Determine outer wrapper styles based on the selected hero template.
+  const outerPadding = templateId === 'hero-margins' ? '0 25px' : '0';
+
   return (
-    // Determine outer wrapper styles based on the selected hero template.
-    // The default hero has no side padding. The "hero-margins" template
-    // introduces 25px padding on the left and right of the outer table.
-    (() => {
-      const outerPadding = templateId === 'hero-margins' ? '0 25px' : '0';
-      return (
-        <>
-        <table
-          role="presentation"
-          width="100%"
-          cellPadding={0}
-          cellSpacing={0}
-          border={0}
-          align="center"
+    <>
+      <table
+        role="presentation"
+        width="100%"
+        cellPadding={0}
+        cellSpacing={0}
+        border={0}
+        align="center"
         style={{ margin: '0', padding: 0 }}
-          onClick={onActivate}
-        >
-          <tbody>
-            <tr>
-              <td align="center" style={{ margin: 0, padding: 0 }}>
-                {/* Wrapper */}
-                <table
-                  role="presentation"
-                  width="100%"
-                  cellPadding={0}
-                  cellSpacing={0}
-                  border={0}
-                  style={{ maxWidth: '600px', margin: '0 auto', padding: outerPadding, background: '#FFFFFF' }}
-                >
-                  <tbody>
-                    <tr>
-                      <td style={{ padding: 0 }}>
-                        {/* Render hero image without a surrounding anchor so clicking does not navigate.
-                           Instead, clicking the image or edit icon opens the selector. */}
-                        <div
-                          className={`hero-image-wrapper${availableImages.length > 0 ? ' selectable' : ''}`}
-                          style={{ position: 'relative', cursor: availableImages.length > 0 ? 'pointer' : 'default' }}
-                          onClick={() => {
-                            if (availableImages.length > 0) {
-                              openSelector();
-                            }
-                          }}
-                        >
-                          <img
-                            src={heroImage || ''}
-                            alt={heroAlt || ''}
-                            style={{ display: 'block', width: '100%', height: 'auto', border: 0, outline: 0, textDecoration: 'none' }}
-                          />
-                          {heroImages && heroImages.length > 0 && (
-                            <div
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onActivate?.();
-                                openSelector();
-                              }}
-                              style={{
-                                position: 'absolute',
-                                bottom: 8,
-                                right: 8,
-                                backgroundColor: 'rgba(0,0,0,0.5)',
-                                color: '#ffffff',
-                                borderRadius: '50%',
-                                padding: 4,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer'
-                              }}
-                              aria-label="Select hero image"
-                              title="Select hero image"
-                            >
-                              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                <path d="M14.69 3.1l6.2 6.2c.27.27.27.7 0 .97l-8.2 8.2c-.17.17-.39.26-.62.26H6.5c-.55 0-1-.45-1-1v-5.57c0-.23.09-.45.26-.62l8.2-8.2c.27-.27.7-.27.97 0zM5 20h14v2H5v-2z" />
-                              </svg>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        {/* Modal overlay for hero image selection. Centered within the right panel */}
-        {showSelector && availableImages.length > 0 && (() => {
-          const container = (document.querySelector('[data-preview-container="true"]') as HTMLElement) || null;
-          const rect = container?.getBoundingClientRect();
-          const overlayStyle: React.CSSProperties = rect ? {
-            position: 'fixed', left: rect.left, top: 0, width: rect.width, height: '100vh',
-            backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-          } : { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 };
-          return (
-          <div onClick={closeSelector} style={overlayStyle}>
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                backgroundColor: '#ffffff',
-                padding: '1rem',
-                borderRadius: 8,
-                maxWidth: '90%',
-                maxHeight: '80%',
-                overflowY: 'auto',
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: 'var(--gap-2)',
-                justifyContent: 'center',
-              }}
-            >
-              {availableImages.map((img, i) => {
-                const isSelected = img === heroImage;
-                return (
-                  <img
-                    key={i}
-                    src={img}
-                    alt=""
-                    style={{
-                      border: isSelected ? '2px solid #d19aa0' : '2px solid transparent',
-                      boxSizing: 'border-box',
-                      width: 120,
-                      height: 120,
-                      objectFit: 'cover',
-                      borderRadius: 6,
-                    }}
-                    onClick={() => handleSelect(img)}
-                  />
-                );
-              })}
-              <button
-                onClick={closeSelector}
-                style={{
-                  marginTop: '0.5rem',
-                  padding: '0.5rem 1rem',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer'
-                }}
+        onClick={onActivate}
+      >
+        <tbody>
+          <tr>
+            <td align="center" style={{ margin: 0, padding: 0 }}>
+              {/* Wrapper */}
+              <table
+                role="presentation"
+                width="100%"
+                cellPadding={0}
+                cellSpacing={0}
+                border={0}
+                style={{ maxWidth: '600px', margin: '0 auto', padding: outerPadding, background: '#FFFFFF' }}
               >
-                Close
-              </button>
-            </div>
+                <tbody>
+                  <tr>
+                    <td style={{ padding: 0 }}>
+                      <div
+                        className={`hero-image-wrapper${availableImages.length > 0 ? ' selectable' : ''}`}
+                        style={{ 
+                          position: 'relative', 
+                          cursor: availableImages.length > 0 ? 'pointer' : 'default',
+                          overflow: 'hidden'
+                        }}
+                        onClick={() => {
+                          if (availableImages.length > 0) {
+                            openSelector();
+                          }
+                        }}
+                        onMouseEnter={(e) => {
+                          const img = e.currentTarget.querySelector('img');
+                          const editIcon = e.currentTarget.querySelector('.edit-icon') as HTMLDivElement;
+                          if (img) img.style.opacity = '0.7';
+                          if (editIcon) editIcon.style.transform = 'translateY(-38px)';
+                        }}
+                        onMouseLeave={(e) => {
+                          const img = e.currentTarget.querySelector('img');
+                          const editIcon = e.currentTarget.querySelector('.edit-icon') as HTMLDivElement;
+                          if (img) img.style.opacity = '1';
+                          if (editIcon) editIcon.style.transform = 'translateY(0)';
+                        }}
+                      >
+                        <img
+                          src={heroImage || ''}
+                          alt={heroAlt || ''}
+                          style={{ 
+                            display: 'block', 
+                            width: '100%', 
+                            height: 'auto', 
+                            border: 0, 
+                            outline: 0, 
+                            textDecoration: 'none',
+                            transition: 'opacity 0.2s ease-in-out'
+                          }}
+                        />
+                        {heroImages && heroImages.length > 0 && (
+                          <div
+                            className="edit-icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onActivate?.();
+                              openSelector();
+                            }}
+                            style={{
+                              position: 'absolute',
+                              bottom: -30,
+                              right: 8,
+                              backgroundColor: 'rgba(0,0,0,0.5)',
+                              color: '#ffffff',
+                              borderRadius: '50%',
+                              padding: 4,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              transform: 'translateY(0)',
+                              transition: 'transform 0.3s ease-in-out'
+                            }}
+                            aria-label="Select hero image"
+                            title="Select hero image"
+                          >
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                              <path d="M14.69 3.1l6.2 6.2c.27.27.27.7 0 .97l-8.2 8.2c-.17.17-.39.26-.62.26H6.5c-.55 0-1-.45-1-1v-5.57c0-.23.09-.45.26-.62l8.2-8.2c.27-.27.7-.27.97 0zM5 20h14v2H5v-2z" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      {/* Backdrop and Dialog only inside <main> panel */}
+      {showSelector && mainRect && (
+        <Backdrop
+          open={showSelector}
+          sx={{
+            left: mainRect.left,
+            top: mainRect.top,
+            width: mainRect.width,
+            height: mainRect.height,
+            zIndex: 1200,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+          }}
+          onClick={closeSelector}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+              background: '#fff',
+              borderRadius: 6,
+              minWidth: 320,
+              maxWidth: 580,
+              width: '100%',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <DialogTitle sx={{ bgcolor: '#F9FAFB', borderRadius: 1}}>
+              Select Hero Image
+            </DialogTitle>
+            <DialogContent dividers>
+              <ImageList cols={4} gap={6} sx={{ mb: 0.5 }}>
+                {availableImages.map((img) => (
+                  <ImageListItem key={img} sx={{ cursor: 'pointer' }}>
+                    <img
+                      src={img}
+                      alt=""
+                      style={{
+                        border: img === heroImage ? '3px solid var(--color-primary)' : '3px solid transparent',
+                        borderRadius: 6,
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                      }}
+                      onClick={() => handleSelect(img)}
+                    />
+                  </ImageListItem>
+                ))}
+              </ImageList>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={closeSelector} variant="outlined">Close</Button>
+            </DialogActions>
           </div>
-          );
-        })()}
-        </>
-      );
-    })()
+        </Backdrop>
+      )}
+    </>
   );
 };
 
