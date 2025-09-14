@@ -372,12 +372,8 @@ export default function Home() {
                     id={`url-${section.id}-${index}`}
                     type="url"
                     label={`Product URL ${index + 1}`}
-                    value={url}
+                    defaultValue={url}
                     fullWidth
-                    onChange={(e) => {
-                      const cleaned = sanitizeUrl(e.currentTarget.value);
-                      handleUrlChange(section.id, index, cleaned);
-                    }}
                     onBlur={(e) => {
                       const cleaned = sanitizeUrl(e.currentTarget.value);
                       handleUrlChange(section.id, index, cleaned);
@@ -416,15 +412,7 @@ export default function Home() {
               ))}
             </div>
             <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: 'var(--gap-2)' }}>
-              <Button
-                onClick={() => {
-                  if (document.activeElement instanceof HTMLElement) {
-                    document.activeElement.blur();
-                  }
-                  setTimeout(() => generateSection(section.id), 0);
-                }}
-                disabled={section.loading}
-              >
+              <Button onClick={() => generateSection(section.id)} disabled={section.loading}>
                 {section.loading ? 'Generating…' : 'Update'}
               </Button>
               <Button variant="outlined" onClick={() => addUrlField(section.id, getDraftUrls(section.id).length)}>
@@ -1820,17 +1808,14 @@ const toggleCodeSection = (key: string) => {
   const generateSection = async (sectionId: number) => {
     const section = bodySections.find((s) => s.id === sectionId);
     if (!section) return;
-    // Always use the latest draftUrls for this section
     const filtered = (draftUrls[sectionId] ?? section.urls).map((u) => u.trim()).filter((u) => u);
     if (filtered.length === 0) {
       alert('Please provide at least one product URL.');
       return;
     }
-    // Save the latest URLs to the section immediately so preview updates on first click
+    // Set loading true for this section and clear previous products
     setBodySections((prev) =>
-      prev.map((s) =>
-        s.id === sectionId ? { ...s, urls: [...filtered], loading: true, products: [] } : s
-      )
+      prev.map((s) => (s.id === sectionId ? { ...s, loading: true, products: [] } : s))
     );
     try {
       // Start loading bar immediately
