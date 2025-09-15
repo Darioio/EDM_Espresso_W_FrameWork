@@ -11,21 +11,54 @@ export interface ImageSelectorProps {
 }
 
 export const ImageSelector: React.FC<ImageSelectorProps> = ({ images, selected, open, onSelect, onClose, anchorRect }) => {
-  // Track a local rect that updates on resize
+  // Track a local rect that updates on panel resize/scroll and window resize.
   const [rect, setRect] = useState<DOMRect | undefined>(anchorRect ?? undefined);
+
   useEffect(() => {
     if (!open) return;
-    function updateRect() {
-      if (anchorRect) {
-        // Try to re-query the main panel for latest rect
-        const mainPanel = document.querySelector('main') as HTMLElement;
-        setRect(mainPanel?.getBoundingClientRect() || anchorRect);
+
+    const getTarget = (): HTMLElement | null => {
+      // Prefer the right preview panel if present; fallback to main wrapper
+      const right = document.querySelector('.right-panel') as HTMLElement | null;
+      if (right) return right;
+      const main = document.querySelector('main') as HTMLElement | null;
+      return main;
+    };
+
+    const updateRect = () => {
+      const el = getTarget();
+      if (el) {
+        setRect(el.getBoundingClientRect());
+      } else if (anchorRect) {
+        setRect(anchorRect);
       }
-    }
-    window.addEventListener('resize', updateRect);
-    // Initial update
+    };
+
+    // Initial compute
     updateRect();
-    return () => window.removeEventListener('resize', updateRect);
+
+    // Listen to window resize
+    window.addEventListener('resize', updateRect);
+
+    // Listen to scrolling on target and window in case of overlayed scroll containers
+    const el = getTarget();
+    el?.addEventListener('scroll', updateRect, { passive: true } as any);
+    document.addEventListener('scroll', updateRect, { passive: true } as any);
+
+    // Observe size changes on the target element
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => updateRect());
+      const target = getTarget();
+      if (target) ro.observe(target);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateRect);
+      el?.removeEventListener('scroll', updateRect as any);
+      document.removeEventListener('scroll', updateRect as any);
+      ro?.disconnect();
+    };
   }, [open, anchorRect]);
   // Deduplicate images by base path (strip query parameters)
   const uniqueImages = (imgs: string[]) => {
@@ -75,13 +108,23 @@ export const ImageSelector: React.FC<ImageSelectorProps> = ({ images, selected, 
             {thumbs.map((img) => {
               const isSelected = img === selected;
               return (
-                <ImageListItem key={img} sx={{ cursor: 'pointer' }}>
+                <ImageListItem
+                  key={img}
+                  sx={{
+                    cursor: 'pointer',
+                    overflow: 'hidden',
+                    borderRadius: 1,
+                    border: isSelected ? '2px solid var(--color-primary)' : '2px solid #e0e0e0',
+                    transition: 'opacity .15s ease, border-color .15s ease, box-shadow .15s ease',
+                    '& img': { transition: 'transform .4s ease' },
+                    '&:hover': { opacity: 1, borderColor: 'var(--color-primary)', boxShadow: '0 0 0 1px rgba(0,0,0,0.02)' },
+                    '&:hover img': { transform: 'scale(1.075)' }
+                  }}
+                >
                   <img
                     src={img}
                     alt=""
                     style={{
-                      border: isSelected ? '3px solid var(--color-primary)' : '3px solid transparent',
-                      borderRadius: 6,
                       width: '100%',
                       height: '100%',
                       objectFit: 'cover',

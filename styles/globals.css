@@ -73,6 +73,9 @@ main {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+    /* Enable container queries based on the main area's inline size */
+  container-type: inline-size;
+  container-name: preview;
 }
 
 /* Container for the two panels: left (accordion editor) and right (preview).
@@ -103,6 +106,9 @@ main {
 .right-panel {
   flex: 1;
   overflow-y: auto;
+  /* Enable container queries based on the preview panel's inline size */
+  container-type: inline-size;
+  container-name: preview;
 }
 
 /* Accordion sections encapsulate each email part (header, body,
@@ -112,7 +118,7 @@ main {
   background-color: var(--color-surface);
   transition: opacity 0.25s ease, outline-color 0.2s ease, box-shadow 0.2s ease;
   outline: 1px solid transparent;
-  //border-radius: var(--radius-small);
+  /* border-radius: var(--radius-small); */
 }
 
 /* Accordion headers are clickable and control the expansion of
@@ -148,7 +154,7 @@ main {
    internal padding. */
 .accordion-content {
   padding: 1rem;
-  //border-bottom: 1px solid #e5e7eb;
+  /* border-bottom: 1px solid #e5e7eb; */
 }
 
 /* Template row: holds the template selector and action icons. The
@@ -235,15 +241,12 @@ main {
 }
 
 /*
-  Responsive stacking for two-column modules. The email templates
-  include an inline style block that assigns .stack-cols to image
-  and copy columns. Mirror that behaviour in the preview by
-  applying the same class. On narrow screens (<=600px) these
-  columns become block-level, span the full width and gain
-  bottom padding. This ensures the image appears above its
-  description on mobile just like in the final email.
+  Responsive stacking for two-column modules scoped to the preview area.
+  When the main preview container is <= 600px wide, stack columns and
+  adjust supporting elements. This uses CSS Container Queries so it does
+  not depend on the full viewport width.
 */
-@media only screen and (max-width: 600px) {
+@container preview (max-width: 600px) {
   .stack-cols {
     display: block !important;
     width: 100% !important;
@@ -450,14 +453,31 @@ label {
   transform: scale(1.05);
 }
 
+/* (Removed duplicate viewport-based media query; behavior now handled
+   by the container query above to scope responsiveness to the main
+   preview area instead of the entire viewport.) */
 
-@media only screen and (max-width: 1000px) {
-  .stack-cols {
-    display:block !important;
-    width:100% !important;
-    padding:0 0 16px 0 !important;
+/* Summary panel as its own container so internal layouts respond to its width */
+.summary-container {
+  container-type: inline-size;
+  container-name: summary;
+}
+
+/* Product thumbnails grid inside Summary panel: default to 2 columns */
+.summary-product-grid {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+/* At >= 600px Summary width, show 3 columns */
+@container summary (min-width: 360px) {
+  .summary-product-grid {
+    grid-template-columns: repeat(3, 1fr);
   }
-  .color-swatches {
-    text-align:right !important;
+}
+
+/* At >= 720px Summary width, show 4 columns (adjust this threshold if needed) */
+@container summary (min-width: 480px) {
+  .summary-product-grid {
+    grid-template-columns: repeat(4, 1fr);
   }
 }

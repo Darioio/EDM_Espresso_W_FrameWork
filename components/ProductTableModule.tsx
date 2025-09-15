@@ -7,6 +7,10 @@ import ImageList from '@mui/material/ImageList';
 import ImageListItem from '@mui/material/ImageListItem';
 import Stack from '@mui/material/Stack';
 import Backdrop from '@mui/material/Backdrop';
+import FormControl from '@mui/material/FormControl';
+import RadioGroup from '@mui/material/RadioGroup';
+import Radio from '@mui/material/Radio';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import { ProductData } from '../lib/types';
 import { uniqueImages, normalizeImage } from '../lib/imageUtils';
 
@@ -26,6 +30,8 @@ interface ProductTableModuleProps {
   onChangeDescSource?: (source: 'metadata' | 'p' | 'ul') => void;
   /** Brand name for fallback alt text */
   brandName?: string;
+  /** Optional padding for wrapper table (top,right,bottom,left in px) */
+  wrapperPadding?: { top: number; right: number; bottom: number; left: number };
 }
 
 const ProductTableModule: React.FC<ProductTableModuleProps> = ({
@@ -38,12 +44,16 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
   overlayContainerRef,
   descSource,
   onChangeDescSource,
-  brandName
+  brandName,
+  wrapperPadding
 }) => {
   // Modal state for the image selector
   const [showSelector, setShowSelector] = useState(false);
   const [descDialogOpen, setDescDialogOpen] = useState(false);
   const [mainRect, setMainRect] = useState<DOMRect | null>(null);
+  const [selectedDesc, setSelectedDesc] = useState<'metadata' | 'p' | 'ul'>(descSource || 'metadata');
+  const [overDescArea, setOverDescArea] = useState(false);
+  const [overDescIcon, setOverDescIcon] = useState(false);
 
   /**
    * Build the list of selectable thumbnails without mutating or duplicating
@@ -63,22 +73,53 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
   };
   const closeSelector = () => setShowSelector(false);
 
-  // Responsive Backdrop logic for both selectors
+  // Responsive Backdrop logic for both selectors: track right panel or main element.
   useEffect(() => {
-    const updateRect = () => {
-      const mainPanel = document.querySelector('main') as HTMLElement;
-      if (mainPanel) {
-        setMainRect(mainPanel.getBoundingClientRect());
-      }
+    if (!(showSelector || descDialogOpen)) return;
+
+    const getTarget = (): HTMLElement | null => {
+      const right = document.querySelector('.right-panel') as HTMLElement | null;
+      if (right) return right;
+      const main = document.querySelector('main') as HTMLElement | null;
+      return main;
     };
-    if (showSelector || descDialogOpen) {
-      updateRect();
-      window.addEventListener('resize', updateRect);
-      return () => {
-        window.removeEventListener('resize', updateRect);
-      };
+
+    const updateRect = () => {
+      const el = getTarget();
+      if (el) setMainRect(el.getBoundingClientRect());
+    };
+
+    // Initial compute
+    updateRect();
+
+    // Window resize
+    window.addEventListener('resize', updateRect);
+
+    // Scroll listeners (in case of scrollable containers)
+    const el = getTarget();
+    el?.addEventListener('scroll', updateRect, { passive: true } as any);
+    document.addEventListener('scroll', updateRect, { passive: true } as any);
+
+    // Observe target element size changes
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => updateRect());
+      const target = getTarget();
+      if (target) ro.observe(target);
     }
+
+    return () => {
+      window.removeEventListener('resize', updateRect);
+      el?.removeEventListener('scroll', updateRect as any);
+      document.removeEventListener('scroll', updateRect as any);
+      ro?.disconnect();
+    };
   }, [showSelector, descDialogOpen]);
+
+  useEffect(() => {
+    // keep dialog selection in sync with current prop when dialog opens
+    if (descDialogOpen) setSelectedDesc(descSource || 'metadata');
+  }, [descDialogOpen, descSource]);
 
   const handleSelectImage = (src: string) => {
     updateProduct(index, 'image', src);
@@ -157,8 +198,12 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
         </span>
       </p>
 
-      {/* Description with per-product source selector */}
-      <div style={{ position: 'relative', overflow: 'hidden' }}>
+      {/* Description with per-product source selector (edit icon + dialog) */}
+      <div
+        style={{ position: 'relative', overflow: 'hidden' }}
+        onMouseEnter={() => setOverDescArea(true)}
+        onMouseLeave={() => setOverDescArea(false)}
+      >
         {((descSource || 'metadata') === 'ul' && (product as any).descriptionUl) ? (
           <ul
             style={{
@@ -192,22 +237,8 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
                         updateProduct(index, 'descriptionUl', `<ul>${items}</ul>`);
                       }
                     }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.opacity = '0.5';
-                      const editIcon = e.currentTarget.parentElement?.parentElement?.querySelector('.edit-copy-icon') as HTMLDivElement;
-                      if (editIcon) editIcon.style.transform = 'translateY(-38px)';
-                      if (editIcon) editIcon.dataset.active = 'true';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.opacity = '1';
-                      const editIcon = e.currentTarget.parentElement?.parentElement?.querySelector('.edit-copy-icon') as HTMLDivElement;
-                      setTimeout(() => {
-                        if (editIcon && editIcon.dataset.active !== 'hover') {
-                          editIcon.style.transform = 'translateY(0)';
-                          editIcon.dataset.active = '';
-                        }
-                      }, 100);
-                    }}
+                    onMouseEnter={e => { e.currentTarget.style.opacity = '0.5'; }}
+                    onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
                   >
                     {li.textContent}
                   </li>
@@ -233,27 +264,13 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
               const text = e.currentTarget.innerText.replace(/\n$/, '');
               updateProduct(index, 'description', text);
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.opacity = '0.5';
-              const editIcon = e.currentTarget.parentElement?.querySelector('.edit-copy-icon') as HTMLDivElement;
-              if (editIcon) editIcon.style.transform = 'translateY(-38px)';
-              if (editIcon) editIcon.dataset.active = 'true';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.opacity = '1';
-              const editIcon = e.currentTarget.parentElement?.querySelector('.edit-copy-icon') as HTMLDivElement;
-              setTimeout(() => {
-                if (editIcon && editIcon.dataset.active !== 'hover') {
-                  editIcon.style.transform = 'translateY(0)';
-                  editIcon.dataset.active = '';
-                }
-              }, 100);
-            }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.5'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
           >
             {((descSource || 'metadata') === 'p' && (product as any).descriptionP) ? (product as any).descriptionP : (product.description || 'Description')}
           </p>
         )}
-        {/* Edit icon for copy block */}
+        {/* Floating edit icon for description source (moved after p/ul in DOM) */}
         <div
           className="edit-copy-icon"
           style={{
@@ -268,73 +285,21 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            transform: 'translateY(0)',
+            zIndex: 2,
+            transform: (overDescArea || overDescIcon || descDialogOpen) ? 'translateY(-38px)' : 'translateY(0)',
             transition: 'transform 0.3s ease-in-out'
           }}
-          title="Edit copy block"
+          onMouseEnter={() => setOverDescIcon(true)}
+          onMouseLeave={() => setOverDescIcon(false)}
           onClick={(e) => {
             e.stopPropagation();
             setDescDialogOpen(true);
-          }}
-          onMouseEnter={(e) => {
-            const target = e.currentTarget as HTMLDivElement;
-            target.style.transform = 'translateY(-38px)';
-            target.dataset.active = 'hover';
-          }}
-          onMouseLeave={(e) => {
-            const target = e.currentTarget as HTMLDivElement;
-            target.dataset.active = '';
-            target.style.transform = 'translateY(0)';
           }}
         >
           <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
             <path d="M14.69 3.1l6.2 6.2c.27.27.27.7 0 .97l-8.2 8.2c-.17.17-.39.26-.62.26H6.5c-.55 0-1-.45-1-1v-5.57c0-.23.09-.45.26-.62l8.2-8.2c.27-.27.7-.27.97 0zM5 20h14v2H5v-2z" />
           </svg>
         </div>
-        {descDialogOpen && mainRect && (
-          <Backdrop
-            open={descDialogOpen}
-            sx={{
-              left: mainRect.left,
-              top: mainRect.top,
-              width: mainRect.width,
-              height: mainRect.height,
-              zIndex: 1200,
-              backgroundColor: 'rgba(0,0,0,0.6)',
-            }}
-            onClick={() => setDescDialogOpen(false)}
-          >
-            <div
-              style={{
-                position: 'absolute',
-                left: '50%',
-                top: '50%',
-                transform: 'translate(-50%, -50%)',
-                background: '#fff',
-                borderRadius: 6,
-                minWidth: 320,
-                maxWidth: 580,
-                width: '100%',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-              }}
-              onClick={e => e.stopPropagation()}
-            >
-              <DialogTitle sx={{ bgcolor: '#F9FAFB', borderRadius: 1}}>
-                Select description source
-              </DialogTitle>
-              <DialogContent dividers>
-                <Stack spacing={2} sx={{ mt: 1 }}>
-                  <Button onClick={() => { onChangeDescSource?.('metadata'); setDescDialogOpen(false); }} variant="contained" fullWidth>Metadata</Button>
-                  <Button onClick={() => { onChangeDescSource?.('p'); setDescDialogOpen(false); }} variant="contained" fullWidth>Description</Button>
-                  <Button onClick={() => { onChangeDescSource?.('ul'); setDescDialogOpen(false); }} variant="contained" fullWidth>Bullet List</Button>
-                </Stack>
-              </DialogContent>
-              <DialogActions>
-                <Button onClick={() => setDescDialogOpen(false)} variant="outlined">Cancel</Button>
-              </DialogActions>
-            </div>
-          </Backdrop>
-        )}
       </div>
 
       {/* CTA + Colours row */}
@@ -420,10 +385,10 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
             display: 'block',
             width: '100%',
             height: 'auto',
-            border: 0,
             outline: 0,
             textDecoration: 'none',
-            transition: 'opacity 0.2s ease-in-out'
+            transition: 'opacity 0.2s ease-in-out',
+            border: '1px solid rgba(0, 0, 0, 0.2)'
           }}
         />
         {/* Edit icon overlay; only show if there are additional images. */}
@@ -482,7 +447,12 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
                 cellPadding={0}
                 cellSpacing={0}
                 border={0}
-                style={{ maxWidth: '600px', margin: '0 auto', background: '#FFFFFF' }}
+                style={{ 
+                  maxWidth: '600px', 
+                  margin: '0 auto', 
+                  background: '#FFFFFF',
+                  padding: wrapperPadding ? `${wrapperPadding.top}px ${wrapperPadding.right}px ${wrapperPadding.bottom}px ${wrapperPadding.left}px` : undefined
+                }}
               >
                 <tbody>
                   <tr>
@@ -546,17 +516,27 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
               Select Product Image
             </DialogTitle>
             <DialogContent dividers>
-              <ImageList cols={6} gap={6} sx={{ m: 0.5 }}>
+              <ImageList cols={5} gap={6} sx={{ m: 0.5 }}>
                 {thumbs.map((img) => {
                   const isSelected = normalizeImage(img) === mainImage;
                   return (
-                    <ImageListItem key={img} sx={{ cursor: 'pointer' }}>
+                    <ImageListItem
+                      key={img}
+                      sx={{
+                        cursor: 'pointer',
+                        overflow: 'hidden',
+                        borderRadius: 1,
+                        border: isSelected ? '2px solid var(--color-primary)' : '2px solid #e0e0e0',
+                        transition: 'opacity .15s ease, border-color .15s ease, box-shadow .15s ease',
+                        '& img': { transition: 'transform .4s ease' },
+                        '&:hover': { opacity: 1, borderColor: 'var(--color-primary)', boxShadow: '0 0 0 1px rgba(0,0,0,0.02)' },
+                        '&:hover img': { transform: 'scale(1.075)' }
+                      }}
+                    >
                       <img
                         src={img}
                         alt=""
                         style={{
-                          border: isSelected ? '3px solid var(--color-primary)' : '3px solid transparent',
-                          borderRadius: 6,
                           width: '100%',
                           height: '100%',
                           objectFit: 'cover',
@@ -570,6 +550,75 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
             </DialogContent>
             <DialogActions>
               <Button onClick={closeSelector} variant="outlined">Close</Button>
+            </DialogActions>
+          </div>
+        </Backdrop>
+      )}
+      {/* Dialog for choosing description source */}
+      {descDialogOpen && mainRect && (
+        <Backdrop
+          open={descDialogOpen}
+          sx={{
+            left: mainRect.left,
+            top: mainRect.top,
+            width: mainRect.width,
+            height: mainRect.height,
+            zIndex: 1200,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+          }}
+          onClick={() => setDescDialogOpen(false)}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+              background: '#fff',
+              borderRadius: 6,
+              minWidth: 360,
+              maxWidth: 640,
+              width: '100%',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.18)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <DialogTitle sx={{ bgcolor: '#F9FAFB', borderRadius: 1 }}>
+              Choose Description
+            </DialogTitle>
+            <DialogContent dividers>
+              <FormControl>
+                <RadioGroup
+                  value={selectedDesc}
+                  onChange={(e) => setSelectedDesc(e.target.value as 'metadata' | 'p' | 'ul')}
+                >
+                  <FormControlLabel value="metadata" control={<Radio />} label="Page metadata" />
+                  <FormControlLabel value="p" control={<Radio />} disabled={!((product as any).descriptionP)} label="First paragraph" />
+                  <FormControlLabel value="ul" control={<Radio />} disabled={!((product as any).descriptionUl)} label="Bullet list" />
+                </RadioGroup>
+              </FormControl>
+              <div style={{ marginTop: 12, borderTop: '1px solid #eee', paddingTop: 12 }}>
+                <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>Preview</div>
+                {selectedDesc === 'ul' && (product as any).descriptionUl ? (
+                  <div dangerouslySetInnerHTML={{ __html: (product as any).descriptionUl }} />
+                ) : (
+                  <p style={{ margin: 0 }}>
+                    {selectedDesc === 'p' && (product as any).descriptionP ? (product as any).descriptionP : (product.description || '')}
+                  </p>
+                )}
+              </div>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setDescDialogOpen(false)}>Cancel</Button>
+              <Button
+                variant="contained"
+                onClick={() => {
+                  onChangeDescSource?.(selectedDesc);
+                  setDescDialogOpen(false);
+                }}
+              >
+                Use this
+              </Button>
             </DialogActions>
           </div>
         </Backdrop>

@@ -74,7 +74,7 @@ export const defaultTemplates: Template[] = [
                         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;">
                           <tr>
                             <td align="center" bgcolor="{{ctaBg}}" style="background:{{ctaBg}};">
-                              <a href="{{cta}}" target="_blank" style="display:inline-block;padding:12px 22px;font-family:'Montserrat',Arial,Helvetica,sans-serif;font-size:14px;line-height:14px;color:#ffffff;text-decoration:none;">
+                              <a href="{{cta}}" target="_blank" style="display:inline-block;padding:12px 22px;font-family:'Montserrat',Arial,Helvetica,sans-serif;font-size:14px;line-height:14px;color:{{ctaText}};text-decoration:none;">
                                 {{ctaLabel}}
                               </a>
                             </td>
@@ -199,7 +199,7 @@ export const defaultTemplates: Template[] = [
                         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;">
                           <tr>
                             <td align="center" bgcolor="{{ctaBg}}" style="background:{{ctaBg}};">
-                              <a href="{{cta}}" target="_blank" style="display:inline-block;padding:12px 22px;font-family:'Montserrat',Arial,Helvetica,sans-serif;font-size:14px;line-height:14px;color:#ffffff;text-decoration:none;">
+                              <a href="{{cta}}" target="_blank" style="display:inline-block;padding:12px 22px;font-family:'Montserrat',Arial,Helvetica,sans-serif;font-size:14px;line-height:14px;color:{{ctaText}};text-decoration:none;">
                                 {{ctaLabel}}
                               </a>
                             </td>

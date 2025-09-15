@@ -140,15 +140,16 @@ export default function AppLayout({ title = 'EDM Espresso', left, right, rightOp
         sx={{
           flexGrow: 1,
           width: { sm: `calc(100% - ${leftWidth}px)` },
+          mr: rightOpen ? `${rightWidth}px` : 0,
           paddingTop: '64px', // Push content below header
         }}
       >
         {children}
       </Box>
 
-      {/* Right panel (temporary, slides in on demand) */}
+      {/* Right panel (persistent when open to push main) */}
       <Drawer
-        variant="temporary"
+        variant={rightOpen ? 'persistent' : 'temporary'}
         anchor="right"
         open={rightOpen}
         onClose={onRightClose}

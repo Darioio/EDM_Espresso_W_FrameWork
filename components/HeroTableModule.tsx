@@ -27,6 +27,8 @@ interface HeroTableModuleProps {
   templateId?: string;
   /** Callback when the module is interacted with */
   onActivate?: () => void;
+  /** Optional padding for wrapper table (top,right,bottom,left in px) */
+  wrapperPadding?: { top: number; right: number; bottom: number; left: number };
 }
 
 /**
@@ -48,26 +50,53 @@ const HeroTableModule: React.FC<HeroTableModuleProps> = ({
   heroImages,
   updateHero,
   templateId,
-  onActivate
+  onActivate,
+  wrapperPadding
 }) => {
   const [showSelector, setShowSelector] = useState(false);
   const [mainRect, setMainRect] = useState<DOMRect | null>(null);
   const availableImages = uniqueImages(heroImages);
 
   useEffect(() => {
-    const updateRect = () => {
-      const mainPanel = document.querySelector('main') as HTMLElement;
-      if (mainPanel) {
-        setMainRect(mainPanel.getBoundingClientRect());
-      }
+    if (!showSelector) return;
+
+    const getTarget = (): HTMLElement | null => {
+      const right = document.querySelector('.right-panel') as HTMLElement | null;
+      if (right) return right;
+      const main = document.querySelector('main') as HTMLElement | null;
+      return main;
     };
-    if (showSelector) {
-      updateRect();
-      window.addEventListener('resize', updateRect);
-      return () => {
-        window.removeEventListener('resize', updateRect);
-      };
+
+    const updateRect = () => {
+      const el = getTarget();
+      if (el) setMainRect(el.getBoundingClientRect());
+    };
+
+    // Initial compute
+    updateRect();
+
+    // Window resize
+    window.addEventListener('resize', updateRect);
+
+    // Scroll listeners
+    const el = getTarget();
+    el?.addEventListener('scroll', updateRect, { passive: true } as any);
+    document.addEventListener('scroll', updateRect, { passive: true } as any);
+
+    // Observe the target element for size changes
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => updateRect());
+      const target = getTarget();
+      if (target) ro.observe(target);
     }
+
+    return () => {
+      window.removeEventListener('resize', updateRect);
+      el?.removeEventListener('scroll', updateRect as any);
+      document.removeEventListener('scroll', updateRect as any);
+      ro?.disconnect();
+    };
   }, [showSelector]);
 
   const openSelector = () => {
@@ -108,7 +137,12 @@ const HeroTableModule: React.FC<HeroTableModuleProps> = ({
                 cellPadding={0}
                 cellSpacing={0}
                 border={0}
-                style={{ maxWidth: '600px', margin: '0 auto', padding: outerPadding, background: '#FFFFFF' }}
+                style={{ 
+                  maxWidth: '600px', 
+                  margin: '0 auto', 
+                  padding: wrapperPadding ? `${wrapperPadding.top}px ${wrapperPadding.right}px ${wrapperPadding.bottom}px ${wrapperPadding.left}px` : outerPadding, 
+                  background: '#FFFFFF' 
+                }}
               >
                 <tbody>
                   <tr>
@@ -226,13 +260,23 @@ const HeroTableModule: React.FC<HeroTableModuleProps> = ({
             <DialogContent dividers>
               <ImageList cols={4} gap={6} sx={{ mb: 0.5 }}>
                 {availableImages.map((img) => (
-                  <ImageListItem key={img} sx={{ cursor: 'pointer' }}>
+                  <ImageListItem
+                    key={img}
+                    sx={{
+                      cursor: 'pointer',
+                      overflow: 'hidden',
+                      borderRadius: 1,
+                      border: img === heroImage ? '2px solid var(--color-primary)' : '2px solid #e0e0e0',
+                      transition: 'opacity .15s ease, border-color .15s ease, box-shadow .15s ease',
+                      '& img': { transition: 'transform .4s ease' },
+                      '&:hover': { opacity: 1, borderColor: 'var(--color-primary)', boxShadow: '0 0 0 1px rgba(0,0,0,0.02)' },
+                      '&:hover img': { transform: 'scale(1.075)' }
+                    }}
+                  >
                     <img
                       src={img}
                       alt=""
                       style={{
-                        border: img === heroImage ? '3px solid var(--color-primary)' : '3px solid transparent',
-                        borderRadius: 6,
                         width: '100%',
                         height: '100%',
                         objectFit: 'cover',
