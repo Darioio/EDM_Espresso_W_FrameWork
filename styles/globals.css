@@ -1,3 +1,17 @@
+/* Remove extra margin between bullet/numbered list items in Tiptap editors */
+.MuiTiptap-RichTextField-content ul,
+.MuiTiptap-RichTextField-content ol {
+  margin-top: 0.2em;
+  margin-bottom: 0.2em;
+  padding-left: 1.5em;
+}
+.MuiTiptap-RichTextField-content li {
+  margin-top: 0;
+  margin-bottom: 0;
+  padding: 0;
+}
+/* Prevent pre-wrapped whitespace from affecting list items */
+
 /*
   Global style sheet for the EDM Expresso web application. The goal
   is to provide a modern, premium look with subtle shadows, rounded
@@ -469,15 +483,22 @@ label {
 }
 
 /* At >= 600px Summary width, show 3 columns */
-@container summary (min-width: 360px) {
+@container summary (min-width: 300px) {
   .summary-product-grid {
     grid-template-columns: repeat(3, 1fr);
   }
 }
 
 /* At >= 720px Summary width, show 4 columns (adjust this threshold if needed) */
-@container summary (min-width: 480px) {
+@container summary (min-width: 500px) {
   .summary-product-grid {
     grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* At >= 720px Summary width, show 4 columns (adjust this threshold if needed) */
+@container summary (min-width: 700px) {
+  .summary-product-grid {
+    grid-template-columns: repeat(5, 1fr);
   }
 }

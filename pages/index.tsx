@@ -5,7 +5,7 @@
 
   // ...existing code...
   // Place this after bodySections and generateSection are defined
-import React, { useState, useEffect, useRef, ReactNode, useCallback } from 'react';
+import React, { useState, useEffect, useRef, ReactNode, useCallback, useMemo } from 'react';
 import Head from 'next/head';
 import AppLayout from '../components/AppLayout';
 import Skeleton from '@mui/material/Skeleton';
@@ -37,6 +37,7 @@ import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 // Padding toggles removed
 import Paper from '@mui/material/Paper';
+import Tooltip from '@mui/material/Tooltip';
 import CloseIcon from '@mui/icons-material/Close';
 import { MuiColorInput } from 'mui-color-input';
 import InputAdornment from '@mui/material/InputAdornment';
@@ -79,7 +80,7 @@ import RichTextField from '../components/shared/RichTextField';
 import HeroTableModule from '../components/HeroTableModule';
 import PaddingControls, { Padding as PaddingValue } from '../components/shared/PaddingControls';
 import { uniqueImages, normalizeImage } from '../lib/imageUtils';
-import { sanitizeEmailHtml, sanitizeInlineHtml } from '../lib/sanitize';
+import { sanitizeEmailHtml, sanitizeInlineHtml, normalizeListHtml } from '../lib/sanitize';
 // ProductTableModule was used for an interactive preview in earlier versions. When
 // rendering via Option A the preview uses the compiled HTML directly so we
 // no longer import or use ProductTableModule here.
@@ -97,6 +98,13 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import FormatBoldIcon from '@mui/icons-material/FormatBold';
+import FormatItalicIcon from '@mui/icons-material/FormatItalic';
+import FormatColorTextIcon from '@mui/icons-material/FormatColorText';
+import FormatSizeIcon from '@mui/icons-material/FormatSize';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
+import LinkIcon from '@mui/icons-material/Link';
 import {
   DndContext,
   closestCenter,
@@ -886,7 +894,7 @@ export default function Home() {
   const [showNewBody, setShowNewBody] = useState(false);
   const [showNewFooter, setShowNewFooter] = useState(false);
   // Summary drawer tab state
-  const [summaryTab, setSummaryTab] = useState(0); // 0: Brand, 1: Product, 2: Assets
+  const [summaryTab, setSummaryTab] = useState(0); // 0: Product, 1: Assets, 2: Brand
 
   /**
    * Final generated HTML pieces. headerHtml/bodyHtml/footerHtml
@@ -994,6 +1002,27 @@ const [finalHtml, setFinalHtml] = useState('');
       return '';
     }
   }
+  
+  // Flexible page type detection for Summary header
+  type PageDetection = { title: string; subline?: string };
+  const detectPageInfo = useCallback((url: string, data: typeof analyzeData): PageDetection => {
+    if (!url) return { title: 'Summary' };
+    let u: URL | null = null;
+    try { u = new URL(url); } catch { /* ignore */ }
+    const path = u?.pathname || url;
+    // Product page
+    if (/\/products\//i.test(path)) {
+      const name = data?.product?.title || '';
+      return { title: 'Product Page Detected!', subline: name ? `Product Name: ${name}` : undefined };
+    }
+    // Collection page
+    if (/\/collections\//i.test(path)) {
+      // We don't parse collection name yet; future: data?.collection?.title
+      return { title: 'Product Page Detected!', subline: 'Collection Name: ' };
+    }
+    // Default
+    return { title: 'Summary' };
+  }, []);
   const [brandLogo, setBrandLogo] = useState<File | null>(null);
   // Wizard: analysis results and visibility
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -1251,6 +1280,136 @@ const toggleCodeSection = (key: string) => {
     const annHtml = emailSafe ? sanitizeEmailHtml(brandAnnouncement) : brandAnnouncement;
     return beforeHead + beforeTd + newTdOpen + annHtml + afterPart;
   };
+
+  // Floating formatting toolbar for the announcement bar inside the preview
+  function AnnFloatingToolbar({ anchorRect, onFormat }: { anchorRect: DOMRect | null; onFormat: (cmd: string) => void }) {
+    if (!anchorRect) return null;
+    const style: React.CSSProperties = {
+      position: 'fixed',
+      top: anchorRect.top - 44 > 0 ? anchorRect.top - 44 : anchorRect.bottom + 8,
+      left: anchorRect.left + (anchorRect.width / 2) - 90,
+      zIndex: 9999,
+      background: '#fff',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+      borderRadius: 8,
+      padding: 4,
+      display: 'flex',
+      gap: 2,
+      minWidth: 180,
+      alignItems: 'center'
+    };
+    return (
+      <Paper elevation={3} style={style}>
+        <Tooltip title="Font Size"><IconButton size="small" onMouseDown={e => { e.preventDefault(); onFormat('fontSize'); }}><FormatSizeIcon fontSize="small" /></IconButton></Tooltip>
+        <Tooltip title="Text Color"><IconButton size="small" onMouseDown={e => { e.preventDefault(); onFormat('foreColor'); }}><FormatColorTextIcon fontSize="small" /></IconButton></Tooltip>
+        <Tooltip title="Bold"><IconButton size="small" onMouseDown={e => { e.preventDefault(); onFormat('bold'); }}><FormatBoldIcon fontSize="small" /></IconButton></Tooltip>
+        <Tooltip title="Italic"><IconButton size="small" onMouseDown={e => { e.preventDefault(); onFormat('italic'); }}><FormatItalicIcon fontSize="small" /></IconButton></Tooltip>
+        <Tooltip title="Bullet List"><IconButton size="small" onMouseDown={e => { e.preventDefault(); onFormat('insertUnorderedList'); }}><FormatListBulletedIcon fontSize="small" /></IconButton></Tooltip>
+        <Tooltip title="Numbered List"><IconButton size="small" onMouseDown={e => { e.preventDefault(); onFormat('insertOrderedList'); }}><FormatListNumberedIcon fontSize="small" /></IconButton></Tooltip>
+        <Tooltip title="Link"><IconButton size="small" onMouseDown={e => { e.preventDefault(); onFormat('createLink'); }}><LinkIcon fontSize="small" /></IconButton></Tooltip>
+      </Paper>
+    );
+  }
+
+  const [annToolbarRect, setAnnToolbarRect] = useState<DOMRect | null>(null);
+  const [annShowToolbar, setAnnShowToolbar] = useState(false);
+  const annFieldRef = useRef<HTMLElement | null>(null);
+
+  // Command handler: focus field then apply document.execCommand just like other modules
+  function handleAnnFormat(cmd: string) {
+    if (!annFieldRef.current) return;
+    annFieldRef.current.focus();
+    if (cmd === 'bold') document.execCommand('bold');
+    if (cmd === 'italic') document.execCommand('italic');
+    if (cmd === 'fontSize') document.execCommand('fontSize', false, '4');
+    if (cmd === 'foreColor') document.execCommand('foreColor', false, '#e91e63');
+    if (cmd === 'insertUnorderedList') document.execCommand('insertUnorderedList');
+    if (cmd === 'insertOrderedList') document.execCommand('insertOrderedList');
+    if (cmd === 'createLink') {
+      const url = window.prompt('Enter the URL');
+      if (url) document.execCommand('createLink', false, url);
+    }
+  }
+
+  // Show toolbar on mousedown inside announcement; hide on outside click
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      const target = e.target as HTMLElement | null;
+      const field = target?.closest('[data-announcement="true"]') as HTMLElement | null;
+      const insideToolbar = !!target?.closest('.MuiPaper-root');
+      if (field) {
+        annFieldRef.current = field;
+        setAnnShowToolbar(true);
+        setAnnToolbarRect(field.getBoundingClientRect());
+      } else if (!insideToolbar) {
+        setAnnShowToolbar(false);
+        annFieldRef.current = null;
+      }
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, []);
+
+  // Show on keyboard focus within announcement
+  useEffect(() => {
+    function onFocusIn(e: FocusEvent) {
+      const target = e.target as HTMLElement | null;
+      const field = target?.closest('[data-announcement="true"]') as HTMLElement | null;
+      if (field) {
+        annFieldRef.current = field;
+        setAnnShowToolbar(true);
+        setAnnToolbarRect(field.getBoundingClientRect());
+      }
+    }
+    document.addEventListener('focusin', onFocusIn);
+    return () => document.removeEventListener('focusin', onFocusIn);
+  }, []);
+
+  // Reposition while selecting text inside announcement only when visible
+  useEffect(() => {
+    function onSelChange() {
+      if (!annShowToolbar || !annFieldRef.current) return;
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return;
+      const range = sel.getRangeAt(0);
+      const node = range.startContainer instanceof Element ? range.startContainer : range.startContainer.parentElement;
+      if (node && annFieldRef.current.contains(node as Node)) {
+        const rect = range.getBoundingClientRect();
+        if (rect && (rect.width || rect.height)) setAnnToolbarRect(rect);
+        else setAnnToolbarRect(annFieldRef.current.getBoundingClientRect());
+      }
+    }
+    document.addEventListener('selectionchange', onSelChange);
+    return () => document.removeEventListener('selectionchange', onSelChange);
+  }, [annShowToolbar]);
+
+  // Keep position on resize/scroll
+  useEffect(() => {
+    function updatePos() {
+      if (annFieldRef.current && annShowToolbar) setAnnToolbarRect(annFieldRef.current.getBoundingClientRect());
+    }
+    window.addEventListener('resize', updatePos);
+    document.addEventListener('scroll', updatePos, { passive: true } as any);
+    return () => {
+      window.removeEventListener('resize', updatePos);
+      document.removeEventListener('scroll', updatePos as any);
+    };
+  }, [annShowToolbar]);
+
+  // Auto-hide when focus leaves announcement and toolbar
+  useEffect(() => {
+    function onFocusOut(e: FocusEvent) {
+      const next = (e.relatedTarget as HTMLElement) || (document.activeElement as HTMLElement | null);
+      const insideToolbar = !!next?.closest('.MuiPaper-root');
+      const insideField = !!next?.closest('[data-announcement="true"]');
+      if (!insideToolbar && !insideField) {
+        setAnnShowToolbar(false);
+        annFieldRef.current = null;
+      }
+    }
+    document.addEventListener('focusout', onFocusOut);
+    return () => document.removeEventListener('focusout', onFocusOut);
+  }, []);
 
   // Inject padding into the wrapper table (the one with max-width:600px)
   const applyWrapperPadding = (html: string, padding?: PaddingValue): string => {
@@ -1759,7 +1918,9 @@ const toggleCodeSection = (key: string) => {
         // expects a Template object.
     let moduleHtml = renderTemplate(tpl as any, productData);
         if (ds === 'ul' && (prod as any).descriptionUl) {
-          const ulHtml = emailSafe ? sanitizeEmailHtml((prod as any).descriptionUl as string) : (prod as any).descriptionUl as string;
+          const rawUl = (prod as any).descriptionUl as string;
+          const processedUl = emailSafe ? sanitizeEmailHtml(rawUl) : rawUl;
+          const ulHtml = normalizeListHtml(processedUl);
           moduleHtml = moduleHtml.replace(/<p[^>]*>\s*\[\[DESC_MARKER\]\]\s*<\/p>/i, ulHtml);
         }
   moduleHtml = stripModuleWrapper(moduleHtml);
@@ -1935,7 +2096,9 @@ const toggleCodeSection = (key: string) => {
       let html = renderTemplate(tpl as any, data);
       // If the chosen description source is UL, mirror the preview replacement in code view
       if (section.descriptionSource === 'ul' && (prod as any).descriptionUl) {
-        const ulHtml = emailSafe ? sanitizeEmailHtml((prod as any).descriptionUl as string) : (prod as any).descriptionUl as string;
+        const rawUl = (prod as any).descriptionUl as string;
+        const processedUl = emailSafe ? sanitizeEmailHtml(rawUl) : rawUl;
+        const ulHtml = normalizeListHtml(processedUl);
         html = html.replace(/<p[^>]*>\s*\{\{\s*description\s*\}\}\s*<\/p>/i, ulHtml);
       }
       html = stripModuleWrapper(html);
@@ -2949,145 +3112,29 @@ const toggleCodeSection = (key: string) => {
         right={
           <Box className="summary-container">
             <Box sx={{ p: 0 }}>
-              <Typography variant="h6" component="h2">Summary</Typography>
+              {(() => {
+                const info = detectPageInfo(brandUrlInput, analyzeData);
+                return (
+                  <>
+                    <Typography variant="h6" component="h2">{info.title}</Typography>
+                    {info.subline && (
+                      <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>{info.subline}</Typography>
+                    )}
+                  </>
+                );
+              })()}
             </Box>
             <Divider sx={{ my: 2 }} />
             {/* Tabs header for Summary sections */}
+
             <Tabs value={summaryTab} onChange={(_, v) => setSummaryTab(v)} aria-label="summary tabs" sx={{ mb: 2 }}>
-              <Tab label="Brand" />
               <Tab label="Product" />
               <Tab label="Assets" />
+              <Tab label="Brand" />
             </Tabs>
 
-            {/* Brand Tab Panel */}
-            {summaryTab === 0 && (
-              <Stack spacing={2}>
-                {/* Logo row first: preview left, upload button right */}
-                <Box>
-                  <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 1 }}>Logo</Typography>
-                  <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
-                    <Box sx={{ flex: 1 }}>
-                      {(brandLogoDataUrl || analyzeData?.logo || analyzeData?.logoSvg) ? (
-                        brandLogoDataUrl ? (
-                          <img src={brandLogoDataUrl} alt="logo" style={{ height: 22, width: 'auto', display: 'block', textAlign: 'left' }} />
-                        ) : analyzeData?.logo ? (
-                          <img src={analyzeData.logo} alt="logo" style={{ height: 22, width: 'auto', display: 'block', textAlign: 'left'  }} />
-                        ) : (
-                          <Box sx={{ height: 22, '& svg': { height: '100%' } }} dangerouslySetInnerHTML={{ __html: analyzeData!.logoSvg! }} />
-                        )
-                      ) : (
-                        <Typography variant="caption" sx={{ color: 'text.disabled' }}>No logo</Typography>
-                      )}
-                    </Box>
-                    <Box>
-                      <Button
-                        component="label"
-                        role={undefined}
-                        tabIndex={-1}
-                        variant="outlined"
-                        color="inherit"
-                        startIcon={
-                          <SvgIcon>
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
-                            </svg>
-                          </SvgIcon>
-                        }
-                      >
-                        Upload a file
-                        <VisuallyHiddenInput
-                          type="file"
-                          accept="image/*"
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                            const file = e.target.files ? e.target.files[0] : null;
-                            setBrandLogo(file);
-                          }}
-                        />
-                      </Button>
-                    </Box>
-                  </Stack>
-                  {brandLogo && (
-                    <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: 'text.secondary' }}>
-                      {(brandLogo as File).name}
-                    </Typography>
-                  )}
-                </Box>
-
-                {/* Website URL */}
-                <Box>
-                  <TextField
-                    id="summary-website"
-                    label="Website URL"
-                    value={brandWebsite}
-                    fullWidth
-                    variant="standard"
-                    sx={{'& .MuiInput-underline:before': { borderBottomColor: 'grey.400' }, '& .MuiInput-underline:after': { borderBottomColor: 'var(--color-primary)' },}}
-                  />
-                </Box>
-
-                {/* Store */}
-                <Box>
-                  <TextField
-                    id="summary-store"
-                    label="Store"
-                    value={analyzeData?.storeName || ''}
-                    fullWidth
-                    onChange={(e)=> setAnalyzeData(d=>d?({...d, storeName: e.target.value}):d)}
-                    variant="standard"
-                    sx={{'& .MuiInput-underline:before': { borderBottomColor: 'grey.400' }, '& .MuiInput-underline:after': { borderBottomColor: 'var(--color-primary)' },}}
-                  />
-                </Box>
-
-                {/* Brand colors */}
-                <Box>
-                  <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 1 }}>Brand colors</Typography>
-                  <Stack direction="row" spacing={1}>
-                    <MuiColorInput id="brand-primary" label="Primary" format="hex" value={brandPrimary} onChange={(value) => setBrandPrimary(value || brandPrimary)} size="small" />
-                    <MuiColorInput id="brand-secondary" label="Secondary" format="hex" value={brandSecondary} onChange={(value) => setBrandSecondary(value || brandSecondary)} size="small" />
-                  </Stack>
-                </Box>
-
-                {/* Brand font */}
-                <TextField
-                  select
-                  fullWidth
-                  label="Brand font"
-                  id="brand-font"
-                  value={brandFont}
-                  onChange={(e) => setBrandFont(e.target.value as string)}
-                  variant="standard"
-                  sx={{'& .MuiInput-underline:before': { borderBottomColor: 'grey.400' }, '& .MuiInput-underline:after': { borderBottomColor: 'var(--color-primary)' },}}
-                >
-                  {(Array.from(new Set(analyzeData?.fontFamilies || [])) as string[]).map((f) => {
-                    const needsQuote = /[^a-z0-9-]/i.test(f);
-                    const css = `${needsQuote ? `'${f}'` : f},Arial,Helvetica,sans-serif`;
-                    return (
-                      <MenuItem key={`det-${f}`} value={css}>{f}</MenuItem>
-                    );
-                  })}
-                  <MenuItem value="'Montserrat',Arial,Helvetica,sans-serif">Default (Montserrat)</MenuItem>
-                  <MenuItem value="Arial, Helvetica, sans-serif">Arial</MenuItem>
-                  <MenuItem value="Georgia, serif">Georgia</MenuItem>
-                  <MenuItem value="Times New Roman, serif">Times New Roman</MenuItem>
-                  <MenuItem value="Courier New, monospace">Courier New</MenuItem>
-                </TextField>
-
-                {/* Announcement (rich text) */}
-                <Box>
-                  <RichTextField
-                    label="Announcement Bar"
-                    value={brandAnnouncement as any}
-                    onChange={(html: string) => setBrandAnnouncement(html)}
-                    placeholder="E.g., Free shipping this week • 20% off sitewide • New arrivals"
-                    minHeight={60}
-                  />
-                </Box>
-
-              </Stack>
-            )}
-
             {/* Product Tab Panel */}
-            {summaryTab === 1 && (
+            {summaryTab === 0 && (
               <Stack spacing={2}>
                 {analyzeData?.product && (
                   <>
@@ -3280,7 +3327,7 @@ const toggleCodeSection = (key: string) => {
             )}
 
             {/* Assets Tab Panel */}
-            {summaryTab === 2 && (
+            {summaryTab === 1 && (
               <Stack spacing={2}>
                 {/* Hero images */}
                 <Box>
@@ -3296,9 +3343,6 @@ const toggleCodeSection = (key: string) => {
                           opacity: (normalizeImage(heroImage || '') === normalizeImage(src)) ? 1 : 0.9,
                           overflow: 'hidden',
                           transition: 'opacity .15s ease, border-color .15s ease, box-shadow .15s ease',
-                          '& img': { transition: 'transform .4s ease' },
-                          '&:hover': { opacity: 1, borderColor: 'var(--color-primary)', boxShadow: '0 0 0 1px rgba(0,0,0,0.02)' },
-                          '&:hover img': { transform: 'scale(1.075)' }
                         }}
                         onClick={() => { setHeroImage(src); setHeroHref(brandWebsite || ''); setHeroAlt(analyzeData?.storeName || ''); }}
                       >
@@ -3355,6 +3399,133 @@ const toggleCodeSection = (key: string) => {
                 )}
               </Stack>
             )}
+
+            {/* Brand Tab Panel */}
+            {summaryTab === 2 && (
+              <Stack spacing={2}>
+                {/* Logo row first: preview left, upload button right */}
+                <Box>
+                  <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 1 }}>Logo</Typography>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
+                    <Box sx={{ flex: 1 }}>
+                      {(brandLogoDataUrl || analyzeData?.logo || analyzeData?.logoSvg) ? (
+                        brandLogoDataUrl ? (
+                          <img src={brandLogoDataUrl} alt="logo" style={{ height: 22, width: 'auto', display: 'block', textAlign: 'left' }} />
+                        ) : analyzeData?.logo ? (
+                          <img src={analyzeData.logo} alt="logo" style={{ height: 22, width: 'auto', display: 'block', textAlign: 'left'  }} />
+                        ) : (
+                          <Box sx={{ height: 22, '& svg': { height: '100%' } }} dangerouslySetInnerHTML={{ __html: analyzeData!.logoSvg! }} />
+                        )
+                      ) : (
+                        <Typography variant="caption" sx={{ color: 'text.disabled' }}>No logo</Typography>
+                      )}
+                    </Box>
+                    <Box>
+                      <Button
+                        component="label"
+                        role={undefined}
+                        tabIndex={-1}
+                        variant="outlined"
+                        color="inherit"
+                        startIcon={
+                          <SvgIcon>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+                            </svg>
+                          </SvgIcon>
+                        }
+                      >
+                        Upload a file
+                        <VisuallyHiddenInput
+                          type="file"
+                          accept="image/*"
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            const file = e.target.files ? e.target.files[0] : null;
+                            setBrandLogo(file);
+                          }}
+                        />
+                      </Button>
+                    </Box>
+                  </Stack>
+                  {brandLogo && (
+                    <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: 'text.secondary' }}>
+                      {(brandLogo as File).name}
+                    </Typography>
+                  )}
+                </Box>
+
+                {/* Website URL */}
+                <Box>
+                  <TextField
+                    id="summary-website"
+                    label="Website URL"
+                    value={brandWebsite}
+                    fullWidth
+                    variant="standard"
+                    sx={{'& .MuiInput-underline:before': { borderBottomColor: 'grey.400' }, '& .MuiInput-underline:after': { borderBottomColor: 'var(--color-primary)' },}}
+                  />
+                </Box>
+
+                {/* Store */}
+                <Box>
+                  <TextField
+                    id="summary-store"
+                    label="Store"
+                    value={analyzeData?.storeName || ''}
+                    fullWidth
+                    onChange={(e)=> setAnalyzeData(d=>d?({...d, storeName: e.target.value}):d)}
+                    variant="standard"
+                    sx={{'& .MuiInput-underline:before': { borderBottomColor: 'grey.400' }, '& .MuiInput-underline:after': { borderBottomColor: 'var(--color-primary)' },}}
+                  />
+                </Box>
+
+                {/* Brand colors */}
+                <Box>
+                  <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 1 }}>Brand colors</Typography>
+                  <Stack direction="row" spacing={1}>
+                    <MuiColorInput id="brand-primary" label="Primary" format="hex" value={brandPrimary} onChange={(value) => setBrandPrimary(value || brandPrimary)} size="small" />
+                    <MuiColorInput id="brand-secondary" label="Secondary" format="hex" value={brandSecondary} onChange={(value) => setBrandSecondary(value || brandSecondary)} size="small" />
+                  </Stack>
+                </Box>
+
+                {/* Brand font */}
+                <TextField
+                  select
+                  fullWidth
+                  label="Brand font"
+                  id="brand-font"
+                  value={brandFont}
+                  onChange={(e) => setBrandFont(e.target.value as string)}
+                  variant="standard"
+                  sx={{'& .MuiInput-underline:before': { borderBottomColor: 'grey.400' }, '& .MuiInput-underline:after': { borderBottomColor: 'var(--color-primary)' },}}
+                >
+                  {(Array.from(new Set(analyzeData?.fontFamilies || [])) as string[]).map((f) => {
+                    const needsQuote = /[^a-z0-9-]/i.test(f);
+                    const css = `${needsQuote ? `'${f}'` : f},Arial,Helvetica,sans-serif`;
+                    return (
+                      <MenuItem key={`det-${f}`} value={css}>{f}</MenuItem>
+                    );
+                  })}
+                  <MenuItem value="'Montserrat',Arial,Helvetica,sans-serif">Default (Montserrat)</MenuItem>
+                  <MenuItem value="Arial, Helvetica, sans-serif">Arial</MenuItem>
+                  <MenuItem value="Georgia, serif">Georgia</MenuItem>
+                  <MenuItem value="Times New Roman, serif">Times New Roman</MenuItem>
+                  <MenuItem value="Courier New, monospace">Courier New</MenuItem>
+                </TextField>
+
+                {/* Announcement (rich text) */}
+                <Box>
+                  <RichTextField
+                    label="Announcement Bar"
+                    value={brandAnnouncement as any}
+                    onChange={(html: string) => setBrandAnnouncement(html)}
+                    placeholder="E.g., Free shipping this week • 20% off sitewide • New arrivals"
+                    minHeight={60}
+                  />
+                </Box>
+
+              </Stack>
+            )}
           </Box>
         }
       >
@@ -3380,6 +3551,9 @@ const toggleCodeSection = (key: string) => {
               <div style={{ overflowY: 'auto', overflowX: 'hidden', padding: '1rem', paddingTop: '0', position: 'relative' }}>
                 {viewMode === 'preview' ? (
                   <div ref={previewRef} data-preview-container="true">
+                    {annShowToolbar && (
+                      <AnnFloatingToolbar anchorRect={annToolbarRect} onFormat={handleAnnFormat} />
+                    )}
                     {showHeaderSection && (
                       loading ? (
                         <Skeleton
@@ -3632,13 +3806,13 @@ const toggleCodeSection = (key: string) => {
                                     product={{ ...prod, description: chosenDescription }}
                                     index={idx}
                                     orientation={orientation}
-                                    updateProduct={(i, field, value) => updateProductInSection(section.id, i, field, value)}
+                                    updateProduct={(i: number, field: any, value: string) => updateProductInSection(section.id, i, field, value)}
                                     onActivate={() => setOpenSection(`body-${section.id}`)}
                                     ctaBg={brandPrimary}
                                     overlayContainerRef={previewRef as any}
                                     brandName={brandName}
                                     descSource={(prod as any).descSource as any}
-                                    onChangeDescSource={(src) => updateProductInSection(section.id, idx, 'descSource' as any, src)}
+                                    onChangeDescSource={(src: any) => updateProductInSection(section.id, idx, 'descSource' as any, src)}
                                   />
                                 );
                               })}

@@ -1,6 +1,157 @@
+import { Box, Paper, IconButton, Tooltip } from '@mui/material';
+import FormatBoldIcon from '@mui/icons-material/FormatBold';
+import FormatItalicIcon from '@mui/icons-material/FormatItalic';
+import FormatColorTextIcon from '@mui/icons-material/FormatColorText';
+import FormatSizeIcon from '@mui/icons-material/FormatSize';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
+import LinkIcon from '@mui/icons-material/Link';
+// Floating formatting toolbar for contentEditable fields
+function FloatingToolbar({ anchorRect, onFormat }: { anchorRect: DOMRect | null, onFormat: (cmd: string) => void }) {
+  if (!anchorRect) return null;
+  const style: React.CSSProperties = {
+    position: 'fixed',
+    top: anchorRect.top - 44 > 0 ? anchorRect.top - 44 : anchorRect.bottom + 8,
+    left: anchorRect.left + (anchorRect.width / 2) - 90,
+    zIndex: 9999,
+    background: '#fff',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+    borderRadius: 8,
+    padding: 4,
+    display: 'flex',
+    gap: 2,
+    minWidth: 180,
+    alignItems: 'center',
+  };
+  return (
+    <Paper elevation={3} style={style}>
+      <Tooltip title="Font Size"><IconButton size="small" onMouseDown={e => { e.preventDefault(); onFormat('fontSize'); }}><FormatSizeIcon fontSize="small" /></IconButton></Tooltip>
+      <Tooltip title="Text Color"><IconButton size="small" onMouseDown={e => { e.preventDefault(); onFormat('foreColor'); }}><FormatColorTextIcon fontSize="small" /></IconButton></Tooltip>
+      <Tooltip title="Bold"><IconButton size="small" onMouseDown={e => { e.preventDefault(); onFormat('bold'); }}><FormatBoldIcon fontSize="small" /></IconButton></Tooltip>
+      <Tooltip title="Italic"><IconButton size="small" onMouseDown={e => { e.preventDefault(); onFormat('italic'); }}><FormatItalicIcon fontSize="small" /></IconButton></Tooltip>
+      <Tooltip title="Bullet List"><IconButton size="small" onMouseDown={e => { e.preventDefault(); onFormat('insertUnorderedList'); }}><FormatListBulletedIcon fontSize="small" /></IconButton></Tooltip>
+      <Tooltip title="Numbered List"><IconButton size="small" onMouseDown={e => { e.preventDefault(); onFormat('insertOrderedList'); }}><FormatListNumberedIcon fontSize="small" /></IconButton></Tooltip>
+      <Tooltip title="Link"><IconButton size="small" onMouseDown={e => { e.preventDefault(); onFormat('createLink'); }}><LinkIcon fontSize="small" /></IconButton></Tooltip>
+    </Paper>
+  );
+}
+  // Floating toolbar state
+  const [toolbarRect, setToolbarRect] = React.useState<DOMRect | null>(null);
+  const [showToolbar, setShowToolbar] = React.useState(false);
+  const toolbarFieldRef = React.useRef<HTMLElement | null>(null);
+
+  // Show toolbar on click/focus; hide on outside click
+  React.useEffect(() => {
+    function handleMouseDown(e: MouseEvent) {
+      const target = e.target as HTMLElement | null;
+      const moduleRoot = target?.closest('.module') as HTMLElement | null;
+      const field = moduleRoot ? (target?.closest('.title, .description, .sale-price, .cta-label') as HTMLElement | null) : null;
+      const insideToolbar = !!target?.closest('.MuiPaper-root');
+      if (field) {
+        toolbarFieldRef.current = field;
+        setShowToolbar(true);
+        setToolbarRect(field.getBoundingClientRect());
+      } else if (!insideToolbar) {
+        setShowToolbar(false);
+        toolbarFieldRef.current = null;
+      }
+    }
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, []);
+
+  // Show toolbar on keyboard focus within editable fields
+  React.useEffect(() => {
+    function handleFocusIn(e: FocusEvent) {
+      const target = e.target as HTMLElement | null;
+      const moduleRoot = target?.closest('.module') as HTMLElement | null;
+      const field = moduleRoot ? (target?.closest('.title, .description, .sale-price, .cta-label') as HTMLElement | null) : null;
+      if (field) {
+        toolbarFieldRef.current = field;
+        setShowToolbar(true);
+        setToolbarRect(field.getBoundingClientRect());
+      }
+    }
+    document.addEventListener('focusin', handleFocusIn);
+    return () => document.removeEventListener('focusin', handleFocusIn);
+  }, []);
+  // Reposition while selecting text only if toolbar is already visible
+  React.useEffect(() => {
+    function handleSelection() {
+      if (!showToolbar || !toolbarFieldRef.current) return;
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return;
+      const range = sel.getRangeAt(0);
+      const node = range.startContainer instanceof Element ? range.startContainer : range.startContainer.parentElement;
+      if (node && toolbarFieldRef.current.contains(node as Node)) {
+        const rect = range.getBoundingClientRect();
+        if (rect && (rect.width || rect.height)) {
+          setToolbarRect(rect);
+        } else {
+          setToolbarRect(toolbarFieldRef.current.getBoundingClientRect());
+        }
+      }
+    }
+    document.addEventListener('selectionchange', handleSelection);
+    return () => document.removeEventListener('selectionchange', handleSelection);
+  }, [showToolbar]);
+
+  // Keep position on resize/scroll
+  React.useEffect(() => {
+    function updatePos() {
+      if (toolbarFieldRef.current && showToolbar) {
+        setToolbarRect(toolbarFieldRef.current.getBoundingClientRect());
+      }
+    }
+    window.addEventListener('resize', updatePos);
+    document.addEventListener('scroll', updatePos, { passive: true } as any);
+    return () => {
+      window.removeEventListener('resize', updatePos);
+      document.removeEventListener('scroll', updatePos as any);
+    };
+  }, [showToolbar]);
+
+  // Auto-hide when focus leaves editable fields and toolbar
+  React.useEffect(() => {
+    function handleFocusOut(e: FocusEvent) {
+      const next = (e.relatedTarget as HTMLElement) || document.activeElement as HTMLElement | null;
+      const insideToolbar = !!next?.closest('.MuiPaper-root');
+      const moduleRoot = next?.closest('.module') as HTMLElement | null;
+      const insideField = !!(moduleRoot && next?.closest('.title, .description, .sale-price, .cta-label'));
+      if (!insideToolbar && !insideField) {
+        setShowToolbar(false);
+        toolbarFieldRef.current = null;
+      }
+    }
+    document.addEventListener('focusout', handleFocusOut);
+    return () => document.removeEventListener('focusout', handleFocusOut);
+  }, []);
+
+  // Formatting command handler
+  function handleFormat(cmd: string) {
+    if (!toolbarFieldRef.current) return;
+    toolbarFieldRef.current.focus();
+    if (cmd === 'bold') document.execCommand('bold');
+    if (cmd === 'italic') document.execCommand('italic');
+    if (cmd === 'fontSize') document.execCommand('fontSize', false, '4');
+    if (cmd === 'foreColor') document.execCommand('foreColor', false, '#e91e63');
+    if (cmd === 'insertUnorderedList') document.execCommand('insertUnorderedList');
+    if (cmd === 'insertOrderedList') document.execCommand('insertOrderedList');
+    if (cmd === 'createLink') {
+      const url = window.prompt('Enter the URL');
+      if (url) document.execCommand('createLink', false, url);
+    }
+  }
 import React from 'react';
 import { uniqueImages } from '../lib/imageUtils';
 import { ProductData } from '../lib/types';
+import { sanitizeEmailHtml, sanitizeInlineHtml } from '../lib/sanitize';
+
+// Universal helper to render any field as sanitized HTML
+function renderSanitizedHtml(html: string, inline = false, fallback = ''): { __html: string } {
+  if (!html) return { __html: fallback };
+  return { __html: inline ? sanitizeInlineHtml(html) : sanitizeEmailHtml(html) };
+}
 
 interface EditableModuleProps {
   product: ProductData;
@@ -68,17 +219,17 @@ const EditableModule: React.FC<EditableModuleProps> = ({
       {/* Text column */}
       <div className="content">
         {/* Title */}
-          <div
-            className="title"
-            contentEditable
-            suppressContentEditableWarning
-            onBlur={(e) => {
-              const text = e.currentTarget.innerText.replace(/\n$/, '');
-              updateProduct(index, 'title', text);
-            }}
-          >
-            {product.title || 'Product title'}
-          </div>
+        <div
+          className="title"
+          contentEditable
+          tabIndex={0}
+          suppressContentEditableWarning
+          onBlur={(e) => {
+            const text = e.currentTarget.innerText.replace(/\n$/, '');
+            updateProduct(index, 'title', text);
+          }}
+          dangerouslySetInnerHTML={renderSanitizedHtml(product.title, true, 'Product title')}
+        />
         {/* Price: show original price if available (non‑editable) and sale price editable */}
         <div className="price">
           {product.originalPrice && (
@@ -89,36 +240,45 @@ const EditableModule: React.FC<EditableModuleProps> = ({
           <span
             className="sale-price"
             contentEditable
+            tabIndex={0}
             suppressContentEditableWarning
             onBlur={(e) => {
               const value = e.currentTarget.innerText.replace(/\$/g, '').trim();
               updateProduct(index, 'price', value);
             }}
-          >
-            {product.price ? '$' + product.price : 'Price'}
-          </span>
+            dangerouslySetInnerHTML={renderSanitizedHtml(product.price ? '$' + product.price : '', true, 'Price')}
+          />
         </div>
         {/* Description */}
-          <div
-            className="description"
-            contentEditable
-            suppressContentEditableWarning
-            onBlur={(e) => {
-              const text = e.currentTarget.innerText.replace(/\n$/, '');
-              const html = text.replace(/\n/g, '<br>');
-              updateProduct(index, 'description', html);
-            }}
-            dangerouslySetInnerHTML={{ __html: product.description || 'Description' }}
-          />
+        <div
+          className="description"
+          contentEditable
+          tabIndex={0}
+          suppressContentEditableWarning
+          onBlur={(e) => {
+            const text = e.currentTarget.innerText.replace(/\n$/, '');
+            const html = text.replace(/\n/g, '<br>');
+            updateProduct(index, 'description', html);
+          }}
+          dangerouslySetInnerHTML={renderSanitizedHtml(product.description, false, 'Description')}
+        />
+  {/* Floating formatting toolbar for preview fields */}
+  {showToolbar && <FloatingToolbar anchorRect={toolbarRect} onFormat={handleFormat} />}
         <div className="cta-row">
           <a
             href={product.cta || product.url}
-            className="button"
+            className="button cta-label"
             target="_blank"
             rel="noopener noreferrer"
-          >
-            SHOP NOW
-          </a>
+            contentEditable
+            tabIndex={0}
+            suppressContentEditableWarning
+            onBlur={(e) => {
+              const html = (e.currentTarget.innerHTML || '').trim() || 'SHOP NOW';
+              updateProduct(index, 'ctaLabel', html);
+            }}
+            dangerouslySetInnerHTML={renderSanitizedHtml(product.ctaLabel || 'SHOP NOW', true)}
+          />
         </div>
       </div>
       {/* Image selector modal */}

@@ -105,3 +105,44 @@ export function sanitizeInlineHtml(html: string): string {
     allowedAttrs: { a: ['href', 'title'] }
   });
 }
+
+// Normalize UL/OL markup to avoid extra spacing between list items that
+// comes from sites wrapping each <li> content with a <p> (which has default margins).
+// This keeps list semantics but unwraps single <p> children in <li> and
+// zeroes margins on any nested <p> within list items. Intended for client-side use.
+export function normalizeListHtml(html: string): string {
+  if (!html) return '';
+  if (typeof window === 'undefined' || typeof document === 'undefined') return html;
+  const container = document.createElement('div');
+  container.innerHTML = html;
+
+  const lists = Array.from(container.querySelectorAll('ul, ol')) as HTMLElement[];
+  for (const list of lists) {
+    const items = Array.from(list.querySelectorAll('li')) as HTMLElement[];
+    for (const li of items) {
+      // If the li has exactly one element child and it's a <p>, unwrap it
+      const elementChildren = Array.from(li.children) as HTMLElement[];
+      if (elementChildren.length === 1 && elementChildren[0].tagName.toLowerCase() === 'p') {
+        const p = elementChildren[0];
+        // Move all children of <p> directly into <li>
+        while (p.firstChild) {
+          li.insertBefore(p.firstChild, p);
+        }
+        li.removeChild(p);
+      }
+      // For any remaining <p> tags nested inside <li>, zero out margins
+      const innerPs = Array.from(li.querySelectorAll('p')) as HTMLElement[];
+      for (const p of innerPs) {
+        p.style.marginTop = '0';
+        p.style.marginBottom = '0';
+      }
+      // Ensure the <li> itself has no extra margins
+      li.style.marginTop = '0';
+      li.style.marginBottom = '0';
+      li.style.padding = li.style.padding || '0';
+      li.style.whiteSpace = 'normal';
+    }
+  }
+
+  return container.innerHTML.trim();
+}

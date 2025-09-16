@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, ImageList, ImageListItem, Backdrop } from '@mui/material';
+import { uniqueImages } from '../../lib/imageUtils';
 
 export interface ImageSelectorProps {
   images: string[];
@@ -60,16 +61,7 @@ export const ImageSelector: React.FC<ImageSelectorProps> = ({ images, selected, 
       ro?.disconnect();
     };
   }, [open, anchorRect]);
-  // Deduplicate images by base path (strip query parameters)
-  const uniqueImages = (imgs: string[]) => {
-    const seen = new Set<string>();
-    return imgs.filter((img) => {
-      const base = img.split('?')[0];
-      if (seen.has(base)) return false;
-      seen.add(base);
-      return true;
-    });
-  };
+  // Deduplicate images using shared normalisation (strip query/fragment, compare by filename)
   const thumbs = uniqueImages(images);
   // For MUI Backdrop positioning
   const style = rect

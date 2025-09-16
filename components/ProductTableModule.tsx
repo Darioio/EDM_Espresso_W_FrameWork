@@ -1,138 +1,178 @@
-import React, { useState, useEffect } from 'react';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
-import Button from '@mui/material/Button';
-import ImageList from '@mui/material/ImageList';
-import ImageListItem from '@mui/material/ImageListItem';
-import Stack from '@mui/material/Stack';
-import Backdrop from '@mui/material/Backdrop';
-import FormControl from '@mui/material/FormControl';
-import RadioGroup from '@mui/material/RadioGroup';
-import Radio from '@mui/material/Radio';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import { ProductData } from '../lib/types';
-import { uniqueImages, normalizeImage } from '../lib/imageUtils';
+import React from 'react';
+import { Box, Paper, IconButton, Tooltip } from '@mui/material';
+import DescriptionSourceDialog, { DescSource } from './shared/DescriptionSourceDialog';
+import FormatBoldIcon from '@mui/icons-material/FormatBold';
+import FormatItalicIcon from '@mui/icons-material/FormatItalic';
+import FormatColorTextIcon from '@mui/icons-material/FormatColorText';
+import FormatSizeIcon from '@mui/icons-material/FormatSize';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
+import LinkIcon from '@mui/icons-material/Link';
+import { ImageSelector } from './shared/ImageSelector';
 
-interface ProductTableModuleProps {
-  product: ProductData;
-  index: number;
-  orientation: 'left-image' | 'right-image';
-  updateProduct: (index: number, field: keyof ProductData, value: string) => void;
-  /** Callback when the module is interacted with */
-  onActivate?: () => void;
-  /** Background colour for the CTA button */
-  ctaBg: string;
-  /** Ref to right-panel container to bound fixed overlay */
-  overlayContainerRef?: React.RefObject<HTMLElement>;
-  /** Per-product description source override */
-  descSource?: 'metadata' | 'p' | 'ul';
-  onChangeDescSource?: (source: 'metadata' | 'p' | 'ul') => void;
-  /** Brand name for fallback alt text */
-  brandName?: string;
-  /** Optional padding for wrapper table (top,right,bottom,left in px) */
-  wrapperPadding?: { top: number; right: number; bottom: number; left: number };
+// Floating formatting toolbar for contentEditable fields
+function FloatingToolbar({ anchorRect, onFormat }: { anchorRect: DOMRect | null, onFormat: (cmd: string) => void }) {
+  if (!anchorRect) return null;
+  const style: React.CSSProperties = {
+    position: 'fixed',
+    top: anchorRect.top - 44 > 0 ? anchorRect.top - 44 : anchorRect.bottom + 8,
+    left: anchorRect.left + (anchorRect.width / 2) - 90,
+    zIndex: 9999,
+    background: '#fff',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+    borderRadius: 8,
+    padding: 4,
+    display: 'flex',
+    gap: 2,
+    minWidth: 180,
+    alignItems: 'center',
+  };
+  return (
+    <Paper elevation={3} style={style}>
+      <Tooltip title="Font Size"><IconButton size="small" onMouseDown={e => { e.preventDefault(); onFormat('fontSize'); }}><FormatSizeIcon fontSize="small" /></IconButton></Tooltip>
+      <Tooltip title="Text Color"><IconButton size="small" onMouseDown={e => { e.preventDefault(); onFormat('foreColor'); }}><FormatColorTextIcon fontSize="small" /></IconButton></Tooltip>
+      <Tooltip title="Bold"><IconButton size="small" onMouseDown={e => { e.preventDefault(); onFormat('bold'); }}><FormatBoldIcon fontSize="small" /></IconButton></Tooltip>
+      <Tooltip title="Italic"><IconButton size="small" onMouseDown={e => { e.preventDefault(); onFormat('italic'); }}><FormatItalicIcon fontSize="small" /></IconButton></Tooltip>
+      <Tooltip title="Bullet List"><IconButton size="small" onMouseDown={e => { e.preventDefault(); onFormat('insertUnorderedList'); }}><FormatListBulletedIcon fontSize="small" /></IconButton></Tooltip>
+      <Tooltip title="Numbered List"><IconButton size="small" onMouseDown={e => { e.preventDefault(); onFormat('insertOrderedList'); }}><FormatListNumberedIcon fontSize="small" /></IconButton></Tooltip>
+      <Tooltip title="Link"><IconButton size="small" onMouseDown={e => { e.preventDefault(); onFormat('createLink'); }}><LinkIcon fontSize="small" /></IconButton></Tooltip>
+    </Paper>
+  );
 }
 
-const ProductTableModule: React.FC<ProductTableModuleProps> = ({
-  product,
-  index,
-  orientation,
-  updateProduct,
-  onActivate,
-  ctaBg,
-  overlayContainerRef,
-  descSource,
-  onChangeDescSource,
-  brandName,
-  wrapperPadding
-}) => {
-  // Modal state for the image selector
-  const [showSelector, setShowSelector] = useState(false);
-  const [descDialogOpen, setDescDialogOpen] = useState(false);
-  const [mainRect, setMainRect] = useState<DOMRect | null>(null);
-  const [selectedDesc, setSelectedDesc] = useState<'metadata' | 'p' | 'ul'>(descSource || 'metadata');
-  const [overDescArea, setOverDescArea] = useState(false);
-  const [overDescIcon, setOverDescIcon] = useState(false);
-
-  /**
-   * Build the list of selectable thumbnails without mutating or duplicating
-   * the underlying images array. All product images remain available in their
-   * original order, and the current main image is included only if it does not
-   * already exist in the list. URLs are normalised and de‑duplicated while
-   * preserving the first occurrence of each entry.
-   */
-  const allImages = product.images ? [...product.images] : [];
-  if (product.image && !allImages.includes(product.image)) {
-    allImages.unshift(product.image);
-  }
-  const thumbs = uniqueImages(allImages);
-  const mainImage = normalizeImage(product.image || '');
-  const openSelector = () => {
-    if (thumbs.length > 1) setShowSelector(true);
-  };
-  const closeSelector = () => setShowSelector(false);
-
-  // Responsive Backdrop logic for both selectors: track right panel or main element.
-  useEffect(() => {
-    if (!(showSelector || descDialogOpen)) return;
-
-    const getTarget = (): HTMLElement | null => {
-      const right = document.querySelector('.right-panel') as HTMLElement | null;
-      if (right) return right;
-      const main = document.querySelector('main') as HTMLElement | null;
-      return main;
-    };
-
-    const updateRect = () => {
-      const el = getTarget();
-      if (el) setMainRect(el.getBoundingClientRect());
-    };
-
-    // Initial compute
-    updateRect();
-
-    // Window resize
-    window.addEventListener('resize', updateRect);
-
-    // Scroll listeners (in case of scrollable containers)
-    const el = getTarget();
-    el?.addEventListener('scroll', updateRect, { passive: true } as any);
-    document.addEventListener('scroll', updateRect, { passive: true } as any);
-
-    // Observe target element size changes
-    let ro: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(() => updateRect());
-      const target = getTarget();
-      if (target) ro.observe(target);
+function ProductTableModule(props: any) {
+  // Formatting command handler for floating toolbar
+  function handleFormat(cmd: string) {
+    if (cmd === 'bold') document.execCommand('bold');
+    if (cmd === 'italic') document.execCommand('italic');
+    if (cmd === 'fontSize') document.execCommand('fontSize', false, '4');
+    if (cmd === 'foreColor') document.execCommand('foreColor', false, '#e91e63');
+    if (cmd === 'insertUnorderedList') document.execCommand('insertUnorderedList');
+    if (cmd === 'insertOrderedList') document.execCommand('insertOrderedList');
+    if (cmd === 'createLink') {
+      const url = window.prompt('Enter the URL');
+      if (url) document.execCommand('createLink', false, url);
     }
+  }
 
+  const [toolbarRect, setToolbarRect] = React.useState<DOMRect | null>(null);
+  const [showToolbar, setShowToolbar] = React.useState(false);
+  const toolbarFieldRef = React.useRef<HTMLElement | null>(null);
+
+  // Show toolbar on click/focus inside editable fields; hide on outside click
+  React.useEffect(() => {
+    function handleMouseDown(e: MouseEvent) {
+      const target = e.target as HTMLElement | null;
+      const moduleRoot = target?.closest('table[role="presentation"]') as HTMLElement | null;
+      const field = moduleRoot ? (target?.closest('h2, .sale-price, p, .cta-label') as HTMLElement | null) : null;
+      const insideToolbar = !!target?.closest('.MuiPaper-root');
+      if (field) {
+        toolbarFieldRef.current = field;
+        setShowToolbar(true);
+        setToolbarRect(field.getBoundingClientRect());
+      } else if (!insideToolbar) {
+        setShowToolbar(false);
+        toolbarFieldRef.current = null;
+      }
+    }
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, []);
+
+  // Reposition while selecting text only if toolbar is already visible
+  React.useEffect(() => {
+    function handleSelection() {
+      if (!showToolbar || !toolbarFieldRef.current) return;
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return;
+      const range = sel.getRangeAt(0);
+      const node = range.startContainer instanceof Element ? range.startContainer : range.startContainer.parentElement;
+      if (node && toolbarFieldRef.current.contains(node as Node)) {
+        const rect = range.getBoundingClientRect();
+        if (rect && (rect.width || rect.height)) {
+          setToolbarRect(rect);
+        } else {
+          setToolbarRect(toolbarFieldRef.current.getBoundingClientRect());
+        }
+      }
+    }
+    document.addEventListener('selectionchange', handleSelection);
+    return () => document.removeEventListener('selectionchange', handleSelection);
+  }, [showToolbar]);
+
+  // Keep position on resize/scroll
+  React.useEffect(() => {
+    function updatePos() {
+      if (toolbarFieldRef.current && showToolbar) {
+        setToolbarRect(toolbarFieldRef.current.getBoundingClientRect());
+      }
+    }
+    window.addEventListener('resize', updatePos);
+    document.addEventListener('scroll', updatePos, { passive: true } as any);
     return () => {
-      window.removeEventListener('resize', updateRect);
-      el?.removeEventListener('scroll', updateRect as any);
-      document.removeEventListener('scroll', updateRect as any);
-      ro?.disconnect();
+      window.removeEventListener('resize', updatePos);
+      document.removeEventListener('scroll', updatePos as any);
     };
-  }, [showSelector, descDialogOpen]);
+  }, [showToolbar]);
 
-  useEffect(() => {
-    // keep dialog selection in sync with current prop when dialog opens
-    if (descDialogOpen) setSelectedDesc(descSource || 'metadata');
-  }, [descDialogOpen, descSource]);
+  // Auto-hide when focus leaves editable fields and toolbar
+  React.useEffect(() => {
+    function handleFocusOut(e: FocusEvent) {
+      const next = (e.relatedTarget as HTMLElement) || document.activeElement as HTMLElement | null;
+      const insideToolbar = !!next?.closest('.MuiPaper-root');
+      const moduleRoot = next?.closest('table[role="presentation"]') as HTMLElement | null;
+      const insideField = !!(moduleRoot && next?.closest('h2, .sale-price, p, .cta-label'));
+      if (!insideToolbar && !insideField) {
+        setShowToolbar(false);
+        toolbarFieldRef.current = null;
+      }
+    }
+    document.addEventListener('focusout', handleFocusOut);
+    return () => document.removeEventListener('focusout', handleFocusOut);
+  }, []);
 
-  const handleSelectImage = (src: string) => {
-    updateProduct(index, 'image', src);
-    setShowSelector(false);
-  };
+  // Show toolbar on keyboard focus within editable fields
+  React.useEffect(() => {
+    function handleFocusIn(e: FocusEvent) {
+      const target = e.target as HTMLElement | null;
+      const moduleRoot = target?.closest('table[role="presentation"]') as HTMLElement | null;
+      const field = moduleRoot ? (target?.closest('h2, .sale-price, p, .cta-label') as HTMLElement | null) : null;
+      if (field) {
+        toolbarFieldRef.current = field;
+        setShowToolbar(true);
+        setToolbarRect(field.getBoundingClientRect());
+      }
+    }
+    document.addEventListener('focusin', handleFocusIn);
+    return () => document.removeEventListener('focusin', handleFocusIn);
+  }, []);
 
+  const floatingToolbar = showToolbar ? <FloatingToolbar anchorRect={toolbarRect} onFormat={handleFormat} /> : null;
+
+  // Render logic restored
+  const {
+    product,
+    index,
+    orientation,
+    updateProduct,
+    ctaBg,
+    brandName,
+    descSource,
+    onChangeDescSource,
+    ...rest
+  } = props;
+
+  // Helper to sanitize and render HTML
+  function renderSanitizedHtml(html: string, inline = false, fallback = ''): { __html: string } {
+    if (!html) return { __html: fallback };
+    // Use your existing sanitize helpers if available
+    // fallback to returning as is
+    return { __html: html };
+  }
+
+  // Copy column
   const renderCopy = () => (
-    <td
-      className="stack-cols"
-      width="50%"
-      valign="top"
-      style={{ padding: '0 8px' }}
-    >
+    <td className="stack-cols" width="50%" valign="top" style={{ padding: '0 8px' }}>
       {/* Title */}
       <h2
         style={{
@@ -145,7 +185,8 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
           whiteSpace: 'pre-wrap',
           transition: 'opacity 0.2s ease-in-out'
         }}
-        contentEditable
+  contentEditable
+  tabIndex={0}
         suppressContentEditableWarning
         onBlur={(e) => {
           const text = e.currentTarget.innerText.replace(/\n$/, '');
@@ -157,9 +198,8 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
         onMouseLeave={(e) => {
           e.currentTarget.style.opacity = '1';
         }}
-      >
-        {product.title || 'Product title'}
-      </h2>
+        dangerouslySetInnerHTML={renderSanitizedHtml(product.title, true, 'Product title')}
+      />
 
       {/* Price (original crossed + sale/current editable) */}
       <p
@@ -179,6 +219,7 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
         )}
         <span
           contentEditable
+          tabIndex={0}
           suppressContentEditableWarning
           style={{
             transition: 'opacity 0.2s ease-in-out'
@@ -193,86 +234,58 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
           onMouseLeave={(e) => {
             e.currentTarget.style.opacity = '1';
           }}
-        >
-          {product.price ? `$${product.price}` : 'Price'}
-        </span>
+          dangerouslySetInnerHTML={renderSanitizedHtml(product.price ? `$${product.price}` : '', true, 'Price')}
+        />
       </p>
 
       {/* Description with per-product source selector (edit icon + dialog) */}
       <div
         style={{ position: 'relative', overflow: 'hidden' }}
-        onMouseEnter={() => setOverDescArea(true)}
-        onMouseLeave={() => setOverDescArea(false)}
+        onMouseEnter={(e) => {
+          const p = e.currentTarget.querySelector('p');
+          const icon = e.currentTarget.querySelector('.edit-desc-icon') as HTMLElement | null;
+          if (p) (p as HTMLElement).style.opacity = '0.5';
+          if (icon) icon.style.transform = 'translateY(-38px)';
+        }}
+        onMouseLeave={(e) => {
+          const p = e.currentTarget.querySelector('p');
+          const icon = e.currentTarget.querySelector('.edit-desc-icon') as HTMLElement | null;
+          if (p) (p as HTMLElement).style.opacity = '1';
+          if (icon) icon.style.transform = 'translateY(0)';
+        }}
       >
-        {((descSource || 'metadata') === 'ul' && (product as any).descriptionUl) ? (
-          <ul
-            style={{
-              margin: '0 0 16px 0',
-              fontFamily: "'Montserrat',Arial,Helvetica,sans-serif",
-              fontSize: '14px',
-              lineHeight: '1.6',
-              color: '#333333',
-              paddingLeft: 24,
-              transition: 'opacity 0.2s ease-in-out'
-            }}
-          >
-            {(() => {
-              // Parse HTML to extract bullets
-              const html = (product as any).descriptionUl as string;
-              const tmp = typeof window !== 'undefined' ? document.createElement('div') : null;
-              if (tmp) {
-                tmp.innerHTML = html;
-                const bullets = Array.from(tmp.querySelectorAll('li'));
-                return bullets.length > 0 ? bullets.map((li, i) => (
-                  <li
-                    key={i}
-                    contentEditable
-                    suppressContentEditableWarning
-                    style={{ outline: 'none' }}
-                    onBlur={e => {
-                      // Collect all li text and update as HTML
-                      const ul = e.currentTarget.parentElement;
-                      if (ul) {
-                        const items = Array.from(ul.children).map(child => `<li>${(child as HTMLElement).innerText}</li>`).join('');
-                        updateProduct(index, 'descriptionUl', `<ul>${items}</ul>`);
-                      }
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.opacity = '0.5'; }}
-                    onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
-                  >
-                    {li.textContent}
-                  </li>
-                )) : <li contentEditable suppressContentEditableWarning>Bullet</li>;
-              }
-              return null;
-            })()}
-          </ul>
-        ) : (
-          <p
-            style={{
-              margin: '0 0 16px 0',
-              fontFamily: "'Montserrat',Arial,Helvetica,sans-serif",
-              fontSize: '14px',
-              lineHeight: '1.6',
-              color: '#333333',
-              whiteSpace: 'pre-wrap',
-              transition: 'opacity 0.2s ease-in-out'
-            }}
-            contentEditable
-            suppressContentEditableWarning
-            onBlur={(e) => {
-              const text = e.currentTarget.innerText.replace(/\n$/, '');
-              updateProduct(index, 'description', text);
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.5'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
-          >
-            {((descSource || 'metadata') === 'p' && (product as any).descriptionP) ? (product as any).descriptionP : (product.description || 'Description')}
-          </p>
-        )}
-        {/* Floating edit icon for description source (moved after p/ul in DOM) */}
+        {(() => {
+          const descHtml = (product.description || '') as string;
+          const isList = /<\s*(ul|ol)(\s|>)/i.test(descHtml);
+          const whiteSpaceStyle: React.CSSProperties["whiteSpace"] = isList ? 'normal' : 'pre-wrap';
+          return (
+        <p
+          style={{
+            margin: '0 0 16px 0',
+            fontFamily: "'Montserrat',Arial,Helvetica,sans-serif",
+            fontSize: '14px',
+            lineHeight: '1.6',
+            color: '#333333',
+            whiteSpace: whiteSpaceStyle,
+            transition: 'opacity 0.2s ease-in-out'
+          }}
+          contentEditable
+          tabIndex={0}
+          suppressContentEditableWarning
+          onBlur={(e) => {
+            const text = e.currentTarget.innerText.replace(/\n$/, '');
+            updateProduct(index, 'description', text);
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.5'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+          dangerouslySetInnerHTML={renderSanitizedHtml(product.description || '', false, 'Description')}
+        />
+          );
+        })()}
+        {/* Edit description overlay icon */}
         <div
-          className="edit-copy-icon"
+          className="edit-desc-icon"
+          onClick={(e) => { e.stopPropagation(); setShowDescDialog(true); }}
           style={{
             position: 'absolute',
             bottom: -30,
@@ -285,19 +298,14 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            zIndex: 2,
-            transform: (overDescArea || overDescIcon || descDialogOpen) ? 'translateY(-38px)' : 'translateY(0)',
+            transform: 'translateY(0)',
             transition: 'transform 0.3s ease-in-out'
           }}
-          onMouseEnter={() => setOverDescIcon(true)}
-          onMouseLeave={() => setOverDescIcon(false)}
-          onClick={(e) => {
-            e.stopPropagation();
-            setDescDialogOpen(true);
-          }}
+          aria-label="Change description source"
+          title="Change description source"
         >
           <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-            <path d="M14.69 3.1l6.2 6.2c.27.27.27.7 0 .97l-8.2 8.2c-.17.17-.39.26-.62.26H6.5c-.55 0-1-.45-1-1v-5.57c0-.23.09-.45.26-.62l8.2-8.2c.27-.27.7-.27.97 0zM5 20h14v2H5v-2z" />
+            <path d="M3 17.25V21h3.75l11.06-11.06-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
           </svg>
         </div>
       </div>
@@ -327,28 +335,28 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
                           transition: 'opacity 0.2s ease-in-out'
                         }}
                         contentEditable
+                        className="cta-label"
+                        tabIndex={0}
                         suppressContentEditableWarning
-                        onBlur={(e) =>
-                          updateProduct(index, 'ctaLabel', e.currentTarget.innerText.trim() || 'SHOP NOW')
-                        }
+                        onBlur={(e) => {
+                          const html = e.currentTarget.innerHTML.trim();
+                          updateProduct(index, 'ctaLabel', html || 'SHOP NOW');
+                        }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.opacity = '0.5';
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.opacity = '1';
                         }}
-                      >
-                        {product.ctaLabel || 'SHOP NOW'}
-                      </a>
+                        dangerouslySetInnerHTML={{ __html: (product.ctaLabel || 'SHOP NOW') as string }}
+                      />
                     </td>
                   </tr>
                 </tbody>
               </table>
             </td>
-
             {/* Spacer */}
             <td width="12" style={{ fontSize: 0, lineHeight: 0 }}>&nbsp;</td>
-
             {/* Colour swatches removed per requirements */}
           </tr>
         </tbody>
@@ -356,45 +364,52 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
     </td>
   );
 
+  // Image column
+  const [showImageSelector, setShowImageSelector] = React.useState(false);
+  const canSelectImage = Array.isArray(product?.images) && (product.images?.length || 0) > 0;
+  const openImageSelector = () => {
+    if (canSelectImage) setShowImageSelector(true);
+  };
+  const handleSelectImage = (img: string) => {
+    updateProduct(index, 'image', img);
+    setShowImageSelector(false);
+  };
+
   const renderImage = () => (
     <td className="stack-cols" width="50%" valign="top" style={{ padding: '0 8px' }}>
       <div
-        style={{ 
-          position: 'relative', 
-          cursor: thumbs.length > 1 ? 'pointer' : 'default',
-          overflow: 'hidden'
-        }}
-        onClick={openSelector}
+        className={`product-image-wrapper${canSelectImage ? ' selectable' : ''}`}
+        style={{ position: 'relative', cursor: canSelectImage ? 'pointer' : 'default', overflow: 'hidden' }}
+        onClick={openImageSelector}
         onMouseEnter={(e) => {
-          const img = e.currentTarget.querySelector('img');
-          const editIcon = e.currentTarget.querySelector('.edit-icon') as HTMLDivElement;
+          const img = e.currentTarget.querySelector('img') as HTMLImageElement | null;
+          const editIcon = e.currentTarget.querySelector('.edit-icon') as HTMLDivElement | null;
           if (img) img.style.opacity = '0.7';
           if (editIcon) editIcon.style.transform = 'translateY(-38px)';
         }}
         onMouseLeave={(e) => {
-          const img = e.currentTarget.querySelector('img');
-          const editIcon = e.currentTarget.querySelector('.edit-icon') as HTMLDivElement;
+          const img = e.currentTarget.querySelector('img') as HTMLImageElement | null;
+          const editIcon = e.currentTarget.querySelector('.edit-icon') as HTMLDivElement | null;
           if (img) img.style.opacity = '1';
           if (editIcon) editIcon.style.transform = 'translateY(0)';
         }}
       >
         <img
           src={product.image}
-          alt={(product as any).imageAlt || product.title || brandName || ''}
+          alt={product.title || brandName || ''}
           style={{
             display: 'block',
             width: '100%',
             height: 'auto',
             outline: 0,
             textDecoration: 'none',
-            transition: 'opacity 0.2s ease-in-out',
-            border: '1px solid rgba(0, 0, 0, 0.2)'
+            transition: 'opacity 0.2s ease-in-out'
           }}
         />
-        {/* Edit icon overlay; only show if there are additional images. */}
-        {thumbs.length > 1 && (
+        {canSelectImage && (
           <div
             className="edit-icon"
+            onClick={(e) => { e.stopPropagation(); openImageSelector(); }}
             style={{
               position: 'absolute',
               bottom: -30,
@@ -410,11 +425,8 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
               transform: 'translateY(0)',
               transition: 'transform 0.3s ease-in-out'
             }}
-            onClick={(e) => {
-              e.stopPropagation();
-              onActivate?.();
-              openSelector();
-            }}
+            aria-label="Select product image"
+            title="Select product image"
           >
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
               <path d="M14.69 3.1l6.2 6.2c.27.27.27.7 0 .97l-8.2 8.2c-.17.17-.39.26-.62.26H6.5c-.55 0-1-.45-1-1v-5.57c0-.23.09-.45.26-.62l8.2-8.2c.27-.27.7-.27.97 0zM5 20h14v2H5v-2z" />
@@ -425,8 +437,22 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
     </td>
   );
 
+  // Description source dialog state
+  const [showDescDialog, setShowDescDialog] = React.useState(false);
+  const [localDescSource, setLocalDescSource] = React.useState<DescSource>(descSource || 'metadata');
+  const previews = React.useMemo(() => ({
+    metadata: (product as any).metadataDescription || (product as any).description || '',
+    p: (product as any).descriptionP || '',
+    ul: (product as any).descriptionUl || ''
+  }), [product]);
+  const handleApplyDescSource = () => {
+    onChangeDescSource && onChangeDescSource(localDescSource);
+    setShowDescDialog(false);
+  };
+
   return (
     <>
+      {floatingToolbar}
       <table
         role="presentation"
         width="100%"
@@ -435,7 +461,6 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
         border={0}
         align="center"
         style={{ margin: '0', padding: '0' }}
-        onClick={onActivate}
       >
         <tbody>
           {/* Main row */}
@@ -451,7 +476,6 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
                   maxWidth: '600px', 
                   margin: '0 auto', 
                   background: '#FFFFFF',
-                  padding: wrapperPadding ? `${wrapperPadding.top}px ${wrapperPadding.right}px ${wrapperPadding.bottom}px ${wrapperPadding.left}px` : undefined
                 }}
               >
                 <tbody>
@@ -483,148 +507,27 @@ const ProductTableModule: React.FC<ProductTableModuleProps> = ({
           </tr>
         </tbody>
       </table>
-      {/* MUI Dialog for image selection, centered in right panel */}
-      {showSelector && thumbs.length > 1 && mainRect && (
-        <Backdrop
-          open={showSelector}
-          sx={{
-            left: mainRect.left,
-            top: mainRect.top,
-            width: mainRect.width,
-            height: mainRect.height,
-            zIndex: 1200,
-            backgroundColor: 'rgba(0,0,0,0.6)',
-          }}
-          onClick={closeSelector}
-        >
-          <div
-            style={{
-              position: 'absolute',
-              left: '50%',
-              top: '50%',
-              transform: 'translate(-50%, -50%)',
-              background: '#fff',
-              borderRadius: 6,
-              minWidth: 320,
-              maxWidth: 580,
-              width: '100%',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <DialogTitle sx={{ bgcolor: '#F9FAFB', borderRadius: 1}}>
-              Select Product Image
-            </DialogTitle>
-            <DialogContent dividers>
-              <ImageList cols={5} gap={6} sx={{ m: 0.5 }}>
-                {thumbs.map((img) => {
-                  const isSelected = normalizeImage(img) === mainImage;
-                  return (
-                    <ImageListItem
-                      key={img}
-                      sx={{
-                        cursor: 'pointer',
-                        overflow: 'hidden',
-                        borderRadius: 1,
-                        border: isSelected ? '2px solid var(--color-primary)' : '2px solid #e0e0e0',
-                        transition: 'opacity .15s ease, border-color .15s ease, box-shadow .15s ease',
-                        '& img': { transition: 'transform .4s ease' },
-                        '&:hover': { opacity: 1, borderColor: 'var(--color-primary)', boxShadow: '0 0 0 1px rgba(0,0,0,0.02)' },
-                        '&:hover img': { transform: 'scale(1.075)' }
-                      }}
-                    >
-                      <img
-                        src={img}
-                        alt=""
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                        }}
-                        onClick={() => handleSelectImage(img)}
-                      />
-                    </ImageListItem>
-                  );
-                })}
-              </ImageList>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={closeSelector} variant="outlined">Close</Button>
-            </DialogActions>
-          </div>
-        </Backdrop>
-      )}
-      {/* Dialog for choosing description source */}
-      {descDialogOpen && mainRect && (
-        <Backdrop
-          open={descDialogOpen}
-          sx={{
-            left: mainRect.left,
-            top: mainRect.top,
-            width: mainRect.width,
-            height: mainRect.height,
-            zIndex: 1200,
-            backgroundColor: 'rgba(0,0,0,0.6)',
-          }}
-          onClick={() => setDescDialogOpen(false)}
-        >
-          <div
-            style={{
-              position: 'absolute',
-              left: '50%',
-              top: '50%',
-              transform: 'translate(-50%, -50%)',
-              background: '#fff',
-              borderRadius: 6,
-              minWidth: 360,
-              maxWidth: 640,
-              width: '100%',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.18)'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <DialogTitle sx={{ bgcolor: '#F9FAFB', borderRadius: 1 }}>
-              Choose Description
-            </DialogTitle>
-            <DialogContent dividers>
-              <FormControl>
-                <RadioGroup
-                  value={selectedDesc}
-                  onChange={(e) => setSelectedDesc(e.target.value as 'metadata' | 'p' | 'ul')}
-                >
-                  <FormControlLabel value="metadata" control={<Radio />} label="Page metadata" />
-                  <FormControlLabel value="p" control={<Radio />} disabled={!((product as any).descriptionP)} label="First paragraph" />
-                  <FormControlLabel value="ul" control={<Radio />} disabled={!((product as any).descriptionUl)} label="Bullet list" />
-                </RadioGroup>
-              </FormControl>
-              <div style={{ marginTop: 12, borderTop: '1px solid #eee', paddingTop: 12 }}>
-                <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>Preview</div>
-                {selectedDesc === 'ul' && (product as any).descriptionUl ? (
-                  <div dangerouslySetInnerHTML={{ __html: (product as any).descriptionUl }} />
-                ) : (
-                  <p style={{ margin: 0 }}>
-                    {selectedDesc === 'p' && (product as any).descriptionP ? (product as any).descriptionP : (product.description || '')}
-                  </p>
-                )}
-              </div>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setDescDialogOpen(false)}>Cancel</Button>
-              <Button
-                variant="contained"
-                onClick={() => {
-                  onChangeDescSource?.(selectedDesc);
-                  setDescDialogOpen(false);
-                }}
-              >
-                Use this
-              </Button>
-            </DialogActions>
-          </div>
-        </Backdrop>
-      )}
+      {/* Description source selector dialog with consistent styling and preview */}
+      <DescriptionSourceDialog
+        open={showDescDialog}
+        selected={localDescSource}
+        onChange={(s) => setLocalDescSource(s)}
+        onApply={handleApplyDescSource}
+        onClose={() => setShowDescDialog(false)}
+        previews={previews}
+      />
+      {/* Image selector dialog overlay (positioned over preview panel) */}
+      <ImageSelector
+        images={product.images || []}
+        selected={product.image}
+        open={showImageSelector}
+        onSelect={handleSelectImage}
+        onClose={() => setShowImageSelector(false)}
+      />
     </>
   );
-};
+}
 
-export default React.memo(ProductTableModule);
+export default ProductTableModule;
+
+

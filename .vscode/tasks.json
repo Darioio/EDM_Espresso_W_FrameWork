@@ -10,6 +10,104 @@
 				"$tsc"
 			],
 			"group": "build"
+		},
+		{
+			"label": "typecheck+build",
+			"type": "shell",
+			"command": "npm run -s build",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "typecheck+build",
+			"type": "shell",
+			"command": "npm run -s build",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "typecheck+build",
+			"type": "shell",
+			"command": "npm run -s build",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "typecheck+build",
+			"type": "shell",
+			"command": "npm run -s build",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "typecheck+build",
+			"type": "shell",
+			"command": "npm run -s build",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "typecheck+build",
+			"type": "shell",
+			"command": "npm run -s build",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "typecheck+build",
+			"type": "shell",
+			"command": "npm run -s build",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "typecheck+build",
+			"type": "shell",
+			"command": "npm run -s build",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "typecheck+build",
+			"type": "shell",
+			"command": "npm run -s build",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "typecheck+build",
+			"type": "shell",
+			"command": "npm run -s build",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "typecheck+build",
+			"type": "shell",
+			"command": "npm run -s build",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "typecheck+build",
+			"type": "shell",
+			"command": "npm run -s build",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "typecheck+build",
+			"type": "shell",
+			"command": "npm run -s build",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "typecheck+build",
+			"type": "shell",
+			"command": "npm run -s build",
+			"isBackground": false,
+			"group": "build"
 		}
 	]
 }

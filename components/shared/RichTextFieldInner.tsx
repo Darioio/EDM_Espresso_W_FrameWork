@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
-import { useEditor } from '@tiptap/react';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
@@ -29,6 +30,19 @@ export type RichTextFieldProps = {
 };
 
 export default function RichTextFieldInner({ label, value, onChange, placeholder, minHeight = 80 }: RichTextFieldProps) {
+  // Disable all tooltip triggers within this editor (right panel) to avoid popups
+  const noTooltipTheme = React.useMemo(() => createTheme({
+    components: {
+      MuiTooltip: {
+        defaultProps: {
+          disableHoverListener: true,
+          disableFocusListener: true,
+          disableTouchListener: true,
+        },
+      },
+    },
+  }), []);
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -65,23 +79,28 @@ export default function RichTextFieldInner({ label, value, onChange, placeholder
   }, [value, editor]);
 
   return (
-    <Box>
-      {label ? (
-        <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 0.5 }}>{label}</Typography>
-      ) : null}
-      <RichTextEditorProvider editor={editor}>
-        {/* Minimal compact toolbar */}
-        <MenuControlsContainer sx={{ mb: 0.5 }}>
-          <MenuSelectFontSize />
-          <MenuButtonTextColor />
-          <MenuButtonBold />
-          <MenuButtonItalic />
-          <MenuButtonBulletedList />
-          <MenuButtonOrderedList />
-          <MenuButtonEditLink />
-        </MenuControlsContainer>
-        <MUIRichTextField variant="outlined" controls={null} />
-      </RichTextEditorProvider>
-    </Box>
+    <ThemeProvider theme={noTooltipTheme}>
+      <Box>
+        {label ? (
+          <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 0.5 }}>{label}</Typography>
+        ) : null}
+        <RichTextEditorProvider editor={editor}>
+          {/* Minimal compact toolbar (no tooltips due to ThemeProvider overrides) */}
+          <MenuControlsContainer sx={{ mb: 0.5 }}>
+            <MenuSelectFontSize />
+            <MenuButtonTextColor />
+            <MenuButtonBold />
+            <MenuButtonItalic />
+            <MenuButtonBulletedList />
+            <MenuButtonOrderedList />
+            <MenuButtonEditLink />
+          </MenuControlsContainer>
+          {/* Render the Tiptap EditorContent directly */}
+          <Box sx={{ minHeight }}>
+            <EditorContent editor={editor} />
+          </Box>
+        </RichTextEditorProvider>
+      </Box>
+    </ThemeProvider>
   );
 }
