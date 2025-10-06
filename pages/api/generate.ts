@@ -69,7 +69,9 @@ export default async function handler(
         console.warn('Skipping URL with no product data:', url);
         continue;
       }
-      products.push(data);
+    // Include a sanitized source URL (strip query params) so the client can map results back
+    const sourceUrl = url.split('?')[0];
+    products.push({ ...data, _sourceUrl: sourceUrl });
       const fragment = renderTemplate(template, data);
       htmlFragments.push(fragment);
     } catch (err) {

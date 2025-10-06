@@ -8,11 +8,12 @@ export type RichTextFieldProps = {
   onChange: (html: string) => void;
   placeholder?: string;
   minHeight?: number;
+  className?: string;
 };
 
 const ClientRichText = dynamic(() => import('./RichTextFieldInner'), { ssr: false });
 
-export default function RichTextField({ label, value, onChange, placeholder, minHeight = 80 }: RichTextFieldProps) {
+export default function RichTextField({ label, value, onChange, placeholder, minHeight = 80, className }: RichTextFieldProps) {
   return (
     <Box>
       {label ? (
@@ -20,9 +21,9 @@ export default function RichTextField({ label, value, onChange, placeholder, min
       ) : null}
       <Paper variant="outlined" sx={{ p: 1, borderRadius: 1 }}>
         {typeof window === 'undefined' ? (
-          <Box sx={{ minHeight }} dangerouslySetInnerHTML={{ __html: value || '' }} />
+          <Box className={className} sx={{ minHeight }} dangerouslySetInnerHTML={{ __html: value || '' }} />
         ) : (
-          <ClientRichText label={undefined} value={value} onChange={onChange} placeholder={placeholder} minHeight={minHeight} />
+          <ClientRichText label={undefined} value={value} onChange={onChange} placeholder={placeholder} minHeight={minHeight} className={className} />
         )}
       </Paper>
     </Box>

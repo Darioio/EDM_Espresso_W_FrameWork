@@ -14,11 +14,16 @@ const DEFAULT_ALLOWED_TAGS = [
   'li',
   'a',
   'p',
-  'br'
+  'span',
+  'br',
+  // Support strikethrough produced by execCommand('strikeThrough')
+  's',
+  'strike'
 ];
 
 const DEFAULT_ALLOWED_ATTRS: Record<string, string[]> = {
-  a: ['href', 'title']
+  a: ['href', 'title'],
+  span: ['style']
 };
 
 function isSafeHref(href: string): boolean {
@@ -74,6 +79,26 @@ export function sanitizeEmailHtml(html: string, opts?: SanitizeOptions): string 
           const name = attr.name.toLowerCase();
           if (!keep.has(name)) {
             el.removeAttribute(attr.name);
+          } else if (name === 'style') {
+            // Filter style to only keep safe properties (color, font-size)
+            const raw = attr.value || '';
+            const pairs = raw.split(';').map(s => s.trim()).filter(Boolean);
+            let colorVal: string | undefined;
+            let fontSizeVal: string | undefined;
+            for (const decl of pairs) {
+              const idx = decl.indexOf(':');
+              if (idx === -1) continue;
+              const prop = decl.slice(0, idx).trim().toLowerCase();
+              const val = decl.slice(idx + 1).trim();
+              if (!val) continue;
+              if (prop === 'color') colorVal = val;
+              else if (prop === 'font-size') fontSizeVal = val;
+            }
+            const next: string[] = [];
+            if (colorVal) next.push(`color:${colorVal}`);
+            if (fontSizeVal) next.push(`font-size:${fontSizeVal}`);
+            if (next.length) el.setAttribute('style', next.join(';'));
+            else el.removeAttribute('style');
           }
         }
         if (tag === 'a') {
@@ -101,8 +126,8 @@ export function sanitizeEmailHtml(html: string, opts?: SanitizeOptions): string 
 // Sanitize for inline contexts (e.g., title inside <h2>): allow only inline tags
 export function sanitizeInlineHtml(html: string): string {
   return sanitizeEmailHtml(html, {
-    allowedTags: ['strong', 'em', 'a', 'br'],
-    allowedAttrs: { a: ['href', 'title'] }
+    allowedTags: ['strong', 'em', 'a', 'br', 's', 'strike', 'span'],
+    allowedAttrs: { a: ['href', 'title'], span: ['style'] }
   });
 }
 
@@ -145,4 +170,24 @@ export function normalizeListHtml(html: string): string {
   }
 
   return container.innerHTML.trim();
+}
+
+// Normalize legacy <font color="..."> tags to <span style="color: ..."> for
+// editor compatibility (e.g., Tiptap Color extension). Keeps only the color
+// attribute and drops other font attributes. Operates client-side.
+export function normalizeFontColorHtml(html: string): string {
+  if (!html) return '';
+  if (typeof window === 'undefined' || typeof document === 'undefined') return html;
+  const container = document.createElement('div');
+  container.innerHTML = html;
+  const fonts = Array.from(container.getElementsByTagName('font')) as HTMLFontElement[];
+  for (const f of fonts) {
+    const color = f.getAttribute('color');
+    const span = document.createElement('span');
+    if (color) span.setAttribute('style', `color:${color}`);
+    // Move children
+    while (f.firstChild) span.appendChild(f.firstChild);
+    f.parentNode?.replaceChild(span, f);
+  }
+  return container.innerHTML;
 }

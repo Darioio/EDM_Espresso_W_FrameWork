@@ -1,4 +1,10 @@
 {
+  "../components/shared/RichTextField.tsx -> ./RichTextFieldInner": {
+    "id": "../components/shared/RichTextField.tsx -> ./RichTextFieldInner",
+    "files": [
+      "static/chunks/components_shared_RichTextFieldInner_tsx.js"
+    ]
+  },
   "index.tsx -> prismjs": {
     "id": "index.tsx -> prismjs",
     "files": [

@@ -64,6 +64,26 @@ export async function parseProduct(url: string): Promise<ProductData> {
   const clean = (value: string | null | undefined): string =>
     (value || '').toString().trim();
 
+  // Normalise image URLs (protocol-relative, root-relative, and relative paths)
+  const buildNormaliser = (pageUrl: string) => {
+    let origin = '';
+    let basePath = '';
+    try {
+      const u = new URL(pageUrl);
+      origin = u.origin;
+      basePath = pageUrl.endsWith('/') ? pageUrl : pageUrl.substring(0, pageUrl.lastIndexOf('/') + 1);
+    } catch (_) {}
+    return (raw: string | null | undefined): string => {
+      const val = (raw || '').trim();
+      if (!val) return '';
+      if (/^https?:\/\//i.test(val)) return val;
+      if (val.startsWith('//')) return `https:${val}`; // assume https for protocol-relative
+      if (val.startsWith('/')) return origin ? origin + val : val; // root-relative
+      return basePath ? basePath + val : val; // relative path
+    };
+  };
+  const normalise = buildNormaliser(url);
+
   let html = '';
   try {
     const response = await axios.get(url, {
@@ -92,6 +112,12 @@ export async function parseProduct(url: string): Promise<ProductData> {
   }
 
   const $ = cheerio.load(html);
+  // Remove any mega-menu content to avoid polluting extraction
+  try {
+    const reMega = /mega[-_ ]?menu/i;
+    const toRemove = $('[class]').filter((_, el) => reMega.test(($(el).attr('class') || ''))).toArray();
+    if (toRemove.length) $(toRemove).remove();
+  } catch (_) {}
 
   // Attempt to parse JSON‑LD structured data first because it typically
   // provides the richest information. We fall back to meta tags if
@@ -104,6 +130,7 @@ export async function parseProduct(url: string): Promise<ProductData> {
     price: '',
     originalPrice: undefined,
     description: '',
+    metadataDescription: undefined,
     image: '',
     images: undefined,
     cta: url
@@ -121,12 +148,22 @@ export async function parseProduct(url: string): Promise<ProductData> {
     clean(getMeta($, 'twitter:title')) ||
     clean($('title').first().text());
 
-  // Description
-  product.description =
-    clean(ld.description) ||
-    clean(getMeta($, 'og:description')) ||
-    clean(getMeta($, 'twitter:description')) ||
-    clean(getMeta($, 'description'));
+  // Description & metadata description
+  // We distinguish the page's canonical META description (<meta name="description">)
+  // from other potential sources like JSON-LD Product.description or Open Graph / Twitter
+  // descriptions. Per requirement: metadataDescription must originate from the meta tag only.
+  const metaTagDescription = clean(getMeta($, 'description'));
+  const ldDesc = clean(ld.description);
+  const ogDesc = clean(getMeta($, 'og:description'));
+  const twitterDesc = clean(getMeta($, 'twitter:description'));
+
+  // Assign only the literal <meta name="description"> content to metadataDescription
+  product.metadataDescription = metaTagDescription || undefined;
+  if (metaTagDescription) {
+    (product as any).originalMetadataDescription = metaTagDescription;
+  }
+  // Default user-facing description prefers the meta tag, then structured data, then OG/Twitter.
+  product.description = metaTagDescription || ldDesc || ogDesc || twitterDesc || '';
 
   // Extract specific description sources from .product__description
   try {
@@ -152,11 +189,12 @@ export async function parseProduct(url: string): Promise<ProductData> {
     : typeof ld.image === 'string'
     ? ld.image
     : undefined;
-  product.image =
+  product.image = normalise(
     clean(ldImage) ||
-    clean(getMeta($, 'og:image')) ||
-    clean(getMeta($, 'twitter:image')) ||
-    clean($('img').first().attr('src'));
+      clean(getMeta($, 'og:image')) ||
+      clean(getMeta($, 'twitter:image')) ||
+      clean($('img').first().attr('src'))
+  );
 
   // Price
   const ldOffers = ld.offers;
@@ -266,17 +304,16 @@ export async function parseProduct(url: string): Promise<ProductData> {
   // Add any additional images from JSON‑LD
   if (Array.isArray(ld.image)) {
     for (const img of ld.image) {
-      if (typeof img === 'string' && /^https?:\/\//i.test(img)) {
-        imageSet.add(img);
+      if (typeof img === 'string') {
+        imageSet.add(normalise(img));
       }
     }
   }
   // DOM extraction: find images with relevant class hints
   $('img').each((_, el) => {
-    const src = clean($(el).attr('src'));
+    const src = normalise($(el).attr('src'));
     if (!src) return;
-    // Only accept absolute URLs
-    if (!/^https?:\/\//i.test(src)) return;
+    if (!/\.(jpe?g|png|gif|webp|avif|svg)(?:[?#].*)?$/i.test(src)) return;
     // Accept images if they contain certain keywords in their class or id
     const classes = ($(el).attr('class') || '') + ' ' + ($(el).parent().attr('class') || '');
     const ids = ($(el).attr('id') || '') + ' ' + ($(el).parent().attr('id') || '');
@@ -320,8 +357,8 @@ export async function parseProduct(url: string): Promise<ProductData> {
       if (Array.isArray(imgs)) {
         for (const p of imgs) {
           if (typeof p === 'string' && p) {
-            const imgUrl = p.startsWith('//') ? `https:${p}` : p;
-            if (/^https?:\/\//i.test(imgUrl)) {
+            const imgUrl = normalise(p.startsWith('//') ? `https:${p}` : p);
+            if (imgUrl) {
               imageSet.add(imgUrl);
             }
           }
@@ -330,8 +367,8 @@ export async function parseProduct(url: string): Promise<ProductData> {
       // Extract featured image
       const feat: unknown = (parsedData as any).featured_image;
       if (typeof feat === 'string' && feat) {
-        const full = feat.startsWith('//') ? `https:${feat}` : feat;
-        if (/^https?:\/\//i.test(full)) {
+        const full = normalise(feat.startsWith('//') ? `https:${feat}` : feat);
+        if (full) {
           imageSet.add(full);
         }
       }

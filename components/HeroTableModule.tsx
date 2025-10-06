@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { HERO_MARGIN_PADDING_DESKTOP, HERO_MARGIN_PADDING_MOBILE } from '../lib/constants';
+import { createPortal } from 'react-dom';
 import { uniqueImages } from '../lib/imageUtils';
-import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
@@ -27,6 +28,8 @@ interface HeroTableModuleProps {
   templateId?: string;
   /** Callback when the module is interacted with */
   onActivate?: () => void;
+  /** Optional padding for wrapper table (top,right,bottom,left in px) */
+  wrapperPadding?: { top: number; right: number; bottom: number; left: number };
 }
 
 /**
@@ -48,26 +51,55 @@ const HeroTableModule: React.FC<HeroTableModuleProps> = ({
   heroImages,
   updateHero,
   templateId,
-  onActivate
+  onActivate,
+  wrapperPadding
 }) => {
   const [showSelector, setShowSelector] = useState(false);
   const [mainRect, setMainRect] = useState<DOMRect | null>(null);
   const availableImages = uniqueImages(heroImages);
 
   useEffect(() => {
-    const updateRect = () => {
-      const mainPanel = document.querySelector('main') as HTMLElement;
-      if (mainPanel) {
-        setMainRect(mainPanel.getBoundingClientRect());
-      }
+    if (!showSelector) return;
+
+    const getTarget = (): HTMLElement | null => {
+      const preview = document.getElementById('preview') as HTMLElement | null;
+      if (preview) return preview;
+      const right = document.querySelector('.right-panel') as HTMLElement | null;
+      if (right) return right;
+      const main = document.querySelector('main') as HTMLElement | null;
+      return main;
     };
-    if (showSelector) {
-      updateRect();
-      window.addEventListener('resize', updateRect);
-      return () => {
-        window.removeEventListener('resize', updateRect);
-      };
+
+    const updateRect = () => {
+      const el = getTarget();
+      if (el) setMainRect(el.getBoundingClientRect());
+    };
+
+    // Initial compute
+    updateRect();
+
+    // Window resize
+    window.addEventListener('resize', updateRect);
+
+    // Scroll listeners
+    const el = getTarget();
+    el?.addEventListener('scroll', updateRect, { passive: true } as any);
+    document.addEventListener('scroll', updateRect, { passive: true } as any);
+
+    // Observe the target element for size changes
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => updateRect());
+      const target = getTarget();
+      if (target) ro.observe(target);
     }
+
+    return () => {
+      window.removeEventListener('resize', updateRect);
+      el?.removeEventListener('scroll', updateRect as any);
+      document.removeEventListener('scroll', updateRect as any);
+      ro?.disconnect();
+    };
   }, [showSelector]);
 
   const openSelector = () => {
@@ -83,8 +115,51 @@ const HeroTableModule: React.FC<HeroTableModuleProps> = ({
     setShowSelector(false);
   };
 
-  // Determine outer wrapper styles based on the selected hero template.
-  const outerPadding = templateId === 'hero-margins' ? '0 25px' : '0';
+  // Determine default template padding. The 'hero-margins' template adds:
+  //  - Outer table padding: 25px on all sides
+  //  - Inner wrapper horizontal padding: 25px (top/bottom 0)
+  // User-provided wrapperPadding (heroPadding) should override ONLY if any side is non‑zero.
+  const isHeroMargins = templateId === 'hero-margins';
+  // Track whether layout is "compact" (preview area narrower than 600px)
+  const [isCompact, setIsCompact] = useState(false);
+  const tableRef = useRef<HTMLTableElement | null>(null);
+
+  useEffect(() => {
+    if (!isHeroMargins) return; // Only matters for hero-margins template
+    const observeEl = () => tableRef.current?.parentElement || tableRef.current;
+
+    const measure = () => {
+      const el = observeEl();
+      if (!el) return;
+      const width = el.clientWidth;
+      // Compact threshold: strictly less than 600px (matching email wrapper max)
+      setIsCompact(width < 600);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    let ro: ResizeObserver | undefined;
+    const target = observeEl();
+    if (target && typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => measure());
+      ro.observe(target);
+    }
+    return () => {
+      window.removeEventListener('resize', measure);
+      ro?.disconnect();
+    };
+  }, [isHeroMargins]);
+  const hasCustomWrapperPadding = !!wrapperPadding && (
+    wrapperPadding.top !== 0 ||
+    wrapperPadding.right !== 0 ||
+    wrapperPadding.bottom !== 0 ||
+    wrapperPadding.left !== 0
+  );
+  // Base padding value for hero-margins template (uniform on all sides). Shrinks in compact mode.
+  const basePad = isHeroMargins ? (isCompact ? HERO_MARGIN_PADDING_MOBILE : HERO_MARGIN_PADDING_DESKTOP) : 0;
+  // If user provided any non-zero custom wrapper padding, respect that fully; otherwise apply uniform padding for hero-margins.
+  const innerPadding = hasCustomWrapperPadding
+    ? `${wrapperPadding!.top}px ${wrapperPadding!.right}px ${wrapperPadding!.bottom}px ${wrapperPadding!.left}px`
+    : (isHeroMargins ? `${basePad}px` : '0');
 
   return (
     <>
@@ -95,7 +170,8 @@ const HeroTableModule: React.FC<HeroTableModuleProps> = ({
         cellSpacing={0}
         border={0}
         align="center"
-        style={{ margin: '0', padding: 0 }}
+        ref={tableRef}
+        // Outer table mirrors template defaults (adds padding when hero-margins; shrinks on narrow width)
         onClick={onActivate}
       >
         <tbody>
@@ -108,7 +184,12 @@ const HeroTableModule: React.FC<HeroTableModuleProps> = ({
                 cellPadding={0}
                 cellSpacing={0}
                 border={0}
-                style={{ maxWidth: '600px', margin: '0 auto', padding: outerPadding, background: '#FFFFFF' }}
+                style={{
+                  maxWidth: '600px',
+                  margin: '0 auto',
+                  padding: innerPadding,
+                  background: '#FFFFFF'
+                }}
               >
                 <tbody>
                   <tr>
@@ -192,26 +273,30 @@ const HeroTableModule: React.FC<HeroTableModuleProps> = ({
         </tbody>
       </table>
       {/* Backdrop and Dialog only inside <main> panel */}
-      {showSelector && mainRect && (
+      {showSelector && mainRect && typeof document !== 'undefined' && createPortal(
         <Backdrop
           open={showSelector}
           sx={{
+            position: 'fixed',
             left: mainRect.left,
             top: mainRect.top,
             width: mainRect.width,
             height: mainRect.height,
+            right: 'auto',
+            bottom: 'auto',
             zIndex: 1200,
             backgroundColor: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
           onClick={closeSelector}
         >
           <div
             style={{
-              position: 'absolute',
-              left: '50%',
-              top: '50%',
-              transform: 'translate(-50%, -50%)',
-              background: '#fff',
+              position: 'relative',
+              background: 'var(--color-surface)',
+              color: 'var(--color-text)',
               borderRadius: 6,
               minWidth: 320,
               maxWidth: 580,
@@ -220,19 +305,30 @@ const HeroTableModule: React.FC<HeroTableModuleProps> = ({
             }}
             onClick={e => e.stopPropagation()}
           >
-            <DialogTitle sx={{ bgcolor: '#F9FAFB', borderRadius: 1}}>
+            <DialogTitle sx={{ bgcolor: 'background.default', borderBottom: '1px solid', borderColor: 'divider', borderTopLeftRadius: 4, borderTopRightRadius: 4}}>
               Select Hero Image
             </DialogTitle>
             <DialogContent dividers>
               <ImageList cols={4} gap={6} sx={{ mb: 0.5 }}>
                 {availableImages.map((img) => (
-                  <ImageListItem key={img} sx={{ cursor: 'pointer' }}>
+                  <ImageListItem
+                    key={img}
+                    sx={{
+                      cursor: 'pointer',
+                      overflow: 'hidden',
+                      borderRadius: 1,
+                      border: '2px solid',
+                      borderColor: img === heroImage ? 'var(--color-primary)' : 'divider',
+                      transition: 'opacity .15s ease, border-color .15s ease, box-shadow .15s ease',
+                      '& img': { transition: 'transform .4s ease' },
+                      '&:hover': { opacity: 1, borderColor: 'var(--color-primary)', boxShadow: '0 0 0 1px rgba(0,0,0,0.02)' },
+                      '&:hover img': { transform: 'scale(1.075)' }
+                    }}
+                  >
                     <img
                       src={img}
                       alt=""
                       style={{
-                        border: img === heroImage ? '3px solid var(--color-primary)' : '3px solid transparent',
-                        borderRadius: 6,
                         width: '100%',
                         height: '100%',
                         objectFit: 'cover',
@@ -247,7 +343,8 @@ const HeroTableModule: React.FC<HeroTableModuleProps> = ({
               <Button onClick={closeSelector} variant="outlined">Close</Button>
             </DialogActions>
           </div>
-        </Backdrop>
+        </Backdrop>,
+        document.body
       )}
     </>
   );

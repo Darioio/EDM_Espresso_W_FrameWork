@@ -279,6 +279,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const response = await axios.get(url, { maxRedirects: 5, headers: { 'User-Agent': 'Mozilla/5.0' } });
     const html = response.data as string;
     const $ = cheerio.load(html);
+    // Remove mega-menu content globally before extraction
+    try {
+      const reMega = /mega[-_ ]?menu/i;
+      const toRemove = $('[class]').filter((_, el) => reMega.test(($(el).attr('class') || ''))).toArray();
+      if (toRemove.length) $(toRemove).remove();
+    } catch (_) {}
     const base = new URL(url).toString();
 
     const product = await parseProduct(url);
