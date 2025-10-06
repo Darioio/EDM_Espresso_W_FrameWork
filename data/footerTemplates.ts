@@ -219,7 +219,7 @@ export const defaultFooterTemplates: FooterTemplate[] = [
             </table>
 
             <!-- Address + legal -->
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:0;padding:0;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:0;padding:0;padding-bottom:25px">
               <tr>
                 <td align="center" style="padding-left:24px;padding-right:24px;">
                   <p style="margin:0 0 6px 0;font-family:Montserrat,Arial,'Helvetica Neue',Helvetica,sans-serif;font-size:14px;line-height:20px;font-weight:700;color:#1D1D1D;">

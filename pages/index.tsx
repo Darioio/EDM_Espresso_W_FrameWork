@@ -1572,7 +1572,6 @@ const [finalHtml, setFinalHtml] = useState('');
       setDebouncedLoading(false);
     }
   }, [loading]);
-  const [brandFont, setBrandFont] = useState('');
   const [brandPrimary, setBrandPrimary] = useState('#d19aa0');
   const [brandSecondary, setBrandSecondary] = useState('#F0C3C7');
   const [brandWebsite, setBrandWebsite] = useState('');
@@ -1982,13 +1981,6 @@ const toggleCodeSection = (key: string) => {
       const regex = new RegExp('#F0C3C7', 'gi');
       out = out.replace(regex, brandSecondary);
     }
-    if (brandFont && brandFont.trim()) {
-      // Replace the default font stack. We do a simple replace on the
-      // exact string used in the templates. If more variants are
-      // needed this could be expanded.
-      const regex = new RegExp("'Montserrat',Arial,Helvetica,sans-serif", 'gi');
-      out = out.replace(regex, brandFont);
-    }
     return out;
   };
 
@@ -2220,20 +2212,9 @@ const toggleCodeSection = (key: string) => {
    */
   const [brandLogoDataUrl, setBrandLogoDataUrl] = useState('');
 
-  // When analyzeData arrives, initialize brand font and announcement if not set
+  // When analyzeData arrives, initialize announcement if not set
   useEffect(() => {
     if (!analyzeData) return;
-    // Prefill brand font: prefer first detected font family; else Montserrat default
-    if (!brandFont || !brandFont.trim()) {
-      const detected = (analyzeData.fontFamilies && analyzeData.fontFamilies[0]) || '';
-      if (detected) {
-        const needsQuote = /[^a-z0-9-]/i.test(detected);
-        const css = `${needsQuote ? `'${detected}'` : detected},Arial,Helvetica,sans-serif`;
-        setBrandFont(css);
-      } else {
-        setBrandFont("'Montserrat',Arial,Helvetica,sans-serif");
-      }
-    }
     // Prefill announcement content with fetched copy if our field is empty
     if ((!brandAnnouncement || !brandAnnouncement.trim()) && analyzeData.announcementCopy) {
       setBrandAnnouncement(analyzeData.announcementCopy);
@@ -2790,8 +2771,7 @@ const toggleCodeSection = (key: string) => {
     footerTemplates,
     bannerTemplates,
     brandPrimary,
-    brandSecondary,
-    brandFont,
+  brandSecondary,
     brandLogoDataUrl,
     brandAnnouncement,
     heroImage,
@@ -3078,10 +3058,20 @@ const toggleCodeSection = (key: string) => {
   };
   // Remove a URL input from a section at index.
   const removeUrlField = (sectionId: number, index: number) => {
+    // Update draft inputs
     setDraftUrls((prev) => {
       const current = prev[sectionId] ?? getDraftUrls(sectionId);
       return { ...prev, [sectionId]: current.filter((_, i) => i !== index) };
     });
+    // Mirror removal into the canonical bodySections data so the preview & composed HTML update instantly
+    setBodySections(prev => prev.map(s => {
+      if (s.id !== sectionId) return s;
+      const urls = s.urls.filter((_, i) => i !== index);
+      const products = s.products.filter((_, i) => i !== index);
+      return { ...s, urls, products };
+    }));
+    // Optionally notify (commented out for noise reduction)
+    // addNotification('Removed product URL');
   };
 
   /**
@@ -3377,8 +3367,7 @@ const toggleCodeSection = (key: string) => {
     setBodyHtml('');
     setFooterHtml('');
     setFinalHtml('');
-    setBrandName('');
-    setBrandFont('');
+  setBrandName('');
     setBrandPrimary('#d19aa0');
     setBrandSecondary('#F0C3C7');
     setBrandWebsite('');
@@ -4902,33 +4891,7 @@ const toggleCodeSection = (key: string) => {
                   </Stack>
                 </Box>
 
-                {/* Brand font */}
-                <TextField
-                  select
-                  fullWidth
-                  label="Brand font"
-                  id="brand-font"
-                  InputLabelProps={{ id: 'brand-font-label' }}
-                  SelectProps={{ labelId: 'brand-font-label', id: 'brand-font' }}
-                  name="brand-font"
-                  value={brandFont}
-                  onChange={(e) => setBrandFont(e.target.value as string)}
-                  variant="standard"
-                  sx={{'& .MuiInput-underline:before': { borderBottomColor: 'grey.400' }, '& .MuiInput-underline:after': { borderBottomColor: 'var(--color-primary)' },}}
-                >
-                  {(Array.from(new Set(analyzeData?.fontFamilies || [])) as string[]).map((f) => {
-                    const needsQuote = /[^a-z0-9-]/i.test(f);
-                    const css = `${needsQuote ? `'${f}'` : f},Arial,Helvetica,sans-serif`;
-                    return (
-                      <MenuItem key={`det-${f}`} value={css}>{f}</MenuItem>
-                    );
-                  })}
-                  <MenuItem value="'Montserrat',Arial,Helvetica,sans-serif">Default (Montserrat)</MenuItem>
-                  <MenuItem value="Arial, Helvetica, sans-serif">Arial</MenuItem>
-                  <MenuItem value="Georgia, serif">Georgia</MenuItem>
-                  <MenuItem value="Times New Roman, serif">Times New Roman</MenuItem>
-                  <MenuItem value="Courier New, monospace">Courier New</MenuItem>
-                </TextField>
+                {/* Brand font selection removed */}
 
                 {/* Announcement (rich text) */}
                 <Box>
@@ -5044,7 +5007,7 @@ const toggleCodeSection = (key: string) => {
                   </IconButton>
                 </div>
               </div>
-              <div id="preview" style={{ overflowY: 'auto', overflowX: 'hidden', padding: '1rem', paddingTop: '0', position: 'relative', paddingBottom: '88px' }}>
+              <div id="preview" style={{ overflowY: 'auto', overflowX: 'hidden', padding: '1rem', paddingTop: '0', position: 'relative', paddingBottom: '0px' }}>
                 {collectionEnriching && (
                   <div
                     style={{
