@@ -1,10 +1,38 @@
 /**
- * Normalise an image URL by removing query parameters and trimming whitespace.
- * This allows consistent comparison of image strings that may include varying
- * cache‑busting tokens.
+ * Normalise an image URL for comparison/deduplication.
+ *
+ * Strategy:
+ *  - Trim whitespace
+ *  - Strip query parameters and fragment (e.g. cache busters like ?v=123)
+ *  - Remove protocol (http/https)
+ *  - Reduce to just the filename (basename) so different hosts/paths collapse
+ *  - Decode and lowercase the filename for robust, case-insensitive matching
+ *
+ * Example: 
+ *  http://www.example.com/cdn/shop/files/pic.jpg?v=1 -> pic.jpg
+ *  https://cdn.shopify.com/s/files/.../files/pic.jpg?v=1 -> pic.jpg
  */
 export function normalizeImage(url: string = ''): string {
-  return url.split('?')[0]?.trim() || '';
+  // Trim whitespace
+  let s = (url || '').trim();
+  // Strip query string and fragment
+  const q = s.indexOf('?');
+  if (q >= 0) s = s.slice(0, q);
+  const h = s.indexOf('#');
+  if (h >= 0) s = s.slice(0, h);
+  // Remove protocol for comparison (http/https)
+  s = s.replace(/^https?:\/\//i, '');
+  // Keep only the last path segment (the filename)
+  const parts = s.split('/').filter(Boolean);
+  let filename = parts.length ? parts[parts.length - 1] : s;
+  // Decode and normalise case
+  try {
+    filename = decodeURIComponent(filename);
+  } catch {
+    // Ignore decoding errors and fall back to raw filename
+  }
+  filename = filename.toLowerCase();
+  return filename;
 }
 
 /**

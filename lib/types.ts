@@ -5,6 +5,10 @@ export interface ProductData {
   price: string;
   originalPrice?: string;
   description: string;
+  // Page metadata description (e.g., og:description / twitter:description / JSON-LD)
+  metadataDescription?: string;
+  // Immutable capture of the original <meta name="description"> at parse time
+  originalMetadataDescription?: string;
   descriptionP?: string;
   descriptionUl?: string;
   image: string;

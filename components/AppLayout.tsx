@@ -4,13 +4,18 @@ import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import SettingsIcon from '@mui/icons-material/Settings';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
+import LightModeIcon from '@mui/icons-material/LightMode';
 import Box from '@mui/material/Box';
 import Drawer from '@mui/material/Drawer';
 import Divider from '@mui/material/Divider';
 import LinearProgress from '@mui/material/LinearProgress';
+import Tooltip from '@mui/material/Tooltip';
+import { useThemeMode } from '../lib/ThemeModeContext';
+import ZoomControl from './shared/ZoomControl';
 
-const INITIAL_LEFT = 380;
-const INITIAL_RIGHT = 380;
+const INITIAL_LEFT = 390;
+const INITIAL_RIGHT = 390;
 const MIN_WIDTH = 260;
 const MAX_WIDTH = 800;
 
@@ -35,6 +40,7 @@ export default function AppLayout({ title = 'EDM Espresso', left, right, rightOp
   const [leftWidth, setLeftWidth] = useState(INITIAL_LEFT);
   const [rightWidth, setRightWidth] = useState(INITIAL_RIGHT);
   const [dragging, setDragging] = useState<'left' | 'right' | null>(null);
+  const { mode, toggle } = useThemeMode();
 
   const clamp = (v: number) => Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, v));
 
@@ -64,6 +70,15 @@ export default function AppLayout({ title = 'EDM Espresso', left, right, rightOp
     }
   }, [dragging, onMouseMove, stopDrag]);
 
+  // Publish right panel width as a global CSS variable so external fixed elements can offset
+  useEffect(() => {
+    const value = rightOpen ? `${rightWidth}px` : '0px';
+    document.documentElement.style.setProperty('--right-panel-offset', value);
+    return () => {
+      // No specific cleanup needed; leave last known value
+    };
+  }, [rightOpen, rightWidth]);
+
   // Visible when explicitly loading or progress is between 0 and 100
   const progressActive = loading || (typeof progress === 'number' && progress >= 0 && progress < 100);
 
@@ -78,24 +93,21 @@ export default function AppLayout({ title = 'EDM Espresso', left, right, rightOp
         />
       )}
 
-      <AppBar
-        position="fixed"
-        color="default"
-        elevation={0}
-        sx={{
-          zIndex: (t) => t.zIndex.drawer + 1,
-          backgroundColor: '#F5F6FA',
-          boxShadow: 'none',
-          borderBottom: (t) => `1px solid ${t.palette.divider}`,
-        }}
-      >
+      <AppBar position="fixed" color="default" elevation={0} sx={{ zIndex: (t) => t.zIndex.drawer + 1 }}>
         <Toolbar>
           <Typography variant="h6" noWrap sx={{ flex: 1 }}>
             {title}
           </Typography>
-          <IconButton aria-label="Brand customisation" onClick={onRightToggle}>
-            <SettingsIcon />
-          </IconButton>
+          <Tooltip title={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
+            <IconButton aria-label="Toggle dark mode" onClick={toggle}>
+              {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Brand customisation">
+            <IconButton aria-label="Brand customisation" onClick={onRightToggle}>
+              <SettingsIcon />
+            </IconButton>
+          </Tooltip>
         </Toolbar>
       </AppBar>
 
@@ -118,6 +130,8 @@ export default function AppLayout({ title = 'EDM Espresso', left, right, rightOp
         <Box sx={{ p: 1, overflow: 'auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
           {left}
         </Box>
+        <Divider />
+        <ZoomControl defaultZoom={100} />
       </Drawer>
 
       {/* Left resizer handle (plain div to avoid Emotion class) */}
@@ -140,15 +154,16 @@ export default function AppLayout({ title = 'EDM Espresso', left, right, rightOp
         sx={{
           flexGrow: 1,
           width: { sm: `calc(100% - ${leftWidth}px)` },
+          mr: rightOpen ? `${rightWidth}px` : 0,
           paddingTop: '64px', // Push content below header
         }}
       >
         {children}
       </Box>
 
-      {/* Right panel (temporary, slides in on demand) */}
+      {/* Right panel (persistent when open to push main) */}
       <Drawer
-        variant="temporary"
+        variant={rightOpen ? 'persistent' : 'temporary'}
         anchor="right"
         open={rightOpen}
         onClose={onRightClose}

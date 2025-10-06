@@ -35,86 +35,60 @@ export const defaultTemplates: Template[] = [
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0;padding:0;">
   <tr>
     <td align="center" style="margin:0;padding:0;">
-      <!-- Wrapper -->
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;margin:0 auto;background:#FFFFFF;">
+      <!-- Wrapper intentionally omitted (handled by section wrapper) -->
+      <!-- Two Columns -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="module-pad" style="width:100%;margin:0;padding:25px;">
         <tr>
-          <td style="padding:25px">
-            <!-- Two Columns -->
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:0;padding:0;">
+          <!-- Left: Image -->
+          <td class="stack-cols" width="50%" valign="top" style="padding:0px 12px 0px 0px;">
+            <a href="{{cta}}" target="_blank" style="text-decoration:none;">
+              <img src="{{image}}" alt="{{title}}" style="display:block;width:100%;height:auto;border:0;outline:0;text-decoration:none;-ms-interpolation-mode:bicubic;">
+            </a>
+          </td>
+          <!-- Right: Copy -->
+          <td class="stack-cols" width="50%" valign="top" style="padding:0px 0px 0px 12px;">
+            <!-- Title -->
+            <h2 style="margin:0 0 10px 0;font-family:Montserrat,Arial,Helvetica,sans-serif;font-size:26px;line-height:1.2;color:#111111;font-weight:300;">
+              {{title}}
+            </h2>
+            <!-- Price (supports original price via priceHtml) -->
+            <p style="margin:0 0 10px 0;font-family:Montserrat,Arial,Helvetica,sans-serif;font-size:16px;line-height:1;color:#111111;font-weight:600;">
+              {{priceHtml}}
+            </p>
+            <!-- Description -->
+            <p style="margin:0 0 16px 0;font-family:Montserrat,Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#333333;">
+              {{description}}
+            </p>
+            <!-- CTA row -->
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;">
               <tr>
-                <!-- Left: Image -->
-                <td class="stack-cols" width="50%" valign="top" style="padding:0 8px;">
-                  <a href="{{cta}}" target="_blank" style="text-decoration:none;">
-                    <img src="{{image}}" alt="{{title}}" style="display:block;width:100%;height:auto;border:0;outline:0;text-decoration:none;-ms-interpolation-mode:bicubic;">
-                  </a>
-                </td>
-
-                <!-- Right: Copy -->
-                <td class="stack-cols" width="50%" valign="top" style="padding:0 8px;">
-                  <!-- Title -->
-                  <h2 style="margin:0 0 10px 0;font-family:'Montserrat',Arial,Helvetica,sans-serif;font-size:26px;line-height:1.2;color:#111111;font-weight:300;">
-                    {{title}}
-                  </h2>
-
-                  <!-- Price (supports original price via priceHtml) -->
-                  <p style="margin:0 0 10px 0;font-family:'Montserrat',Arial,Helvetica,sans-serif;font-size:16px;line-height:1;color:#111111;font-weight:600;">
-                    {{priceHtml}}
-                  </p>
-
-                  <!-- Description -->
-                  <p style="margin:0 0 16px 0;font-family:'Montserrat',Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#333333;">
-                    {{description}}
-                  </p>
-
-                  <!-- CTA + Colours row -->
-                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;">
+                <td align="left" valign="middle" style="padding:0;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;" class="cta">
                     <tr>
-                      <!-- CTA (left) -->
-                      <td align="left" valign="middle" style="padding:0;">
-                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;">
-                          <tr>
-                            <td align="center" bgcolor="{{ctaBg}}" style="background:{{ctaBg}};">
-                              <a href="{{cta}}" target="_blank" style="display:inline-block;padding:12px 22px;font-family:'Montserrat',Arial,Helvetica,sans-serif;font-size:14px;line-height:14px;color:#ffffff;text-decoration:none;">
-                                {{ctaLabel}}
-                              </a>
-                            </td>
-                          </tr>
-                        </table>
-                      </td>
-                      <!-- Spacer -->
-                      <td width="12" style="font-size:0;line-height:0;">&nbsp;</td>
-                      <!-- Colours (right aligned) -->
-                      <td align="right" valign="middle" class="color-swatches" style="padding:0;">
-                        {{coloursHtml}}
+                      <td align="center" bgcolor="{{ctaBg}}" style="background:{{ctaBg}};">
+                        <a href="{{cta}}" target="_blank" style="display:inline-block;padding:12px 22px;font-family:Montserrat,Arial,Helvetica,sans-serif;font-size:14px;line-height:14px;color:#ffffff;text-decoration:none;">
+                          {{ctaLabel}}
+                        </a>
                       </td>
                     </tr>
                   </table>
-                  <!-- /CTA + Colours row -->
-
                 </td>
               </tr>
             </table>
-            <!-- /Two Columns -->
+            <!-- /CTA row -->
           </td>
         </tr>
       </table>
-      <!-- /Wrapper -->
+      <!-- /Two Columns -->
     </td>
   </tr>
 </table>
 <!-- === End: Product Feature Module === -->
-
-<!-- Mobile Stacking -->
 <style>
 @media only screen and (max-width: 600px) {
-  .stack-cols {
-    display:block !important;
-    width:100% !important;
-    padding:0 0 16px 0 !important;
-  }
-  .color-swatches {
-    text-align:right !important;
-  }
+  .stack-cols { display:block !important; width:100% !important; padding:0 0 16px 0 !important; }
+  .module-pad { padding:12px !important; }
+  .cta { width:100% !important; }
 }
 </style>`
   }
@@ -167,86 +141,60 @@ export const defaultTemplates: Template[] = [
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0;padding:0;">
   <tr>
     <td align="center" style="margin:0;padding:0;">
-      <!-- Wrapper -->
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;margin:0 auto;background:#FFFFFF;">
+      <!-- Wrapper intentionally omitted (handled by section wrapper) -->
+      <!-- Two Columns (copy first, image second) -->
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="module-pad" style="width:100%;margin:0;padding:25px;">
         <tr>
-          <td style="padding:25px;">
-            <!-- Two Columns -->
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:0;padding:0;">
+          <!-- Left: Copy -->
+          <td class="stack-cols" width="50%" valign="top" style="padding:0px 12px 0px 0px;">
+            <!-- Title -->
+            <h2 style="margin:0 0 10px 0;font-family:Montserrat,Arial,Helvetica,sans-serif;font-size:26px;line-height:1.2;color:#111111;font-weight:300;">
+              {{title}}
+            </h2>
+            <!-- Price -->
+            <p style="margin:0 0 10px 0;font-family:Montserrat,Arial,Helvetica,sans-serif;font-size:16px;line-height:1;color:#111111;font-weight:600;">
+              {{priceHtml}}
+            </p>
+            <!-- Description -->
+            <p style="margin:0 0 16px 0;font-family:Montserrat,Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#333333;">
+              {{description}}
+            </p>
+            <!-- CTA row -->
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;">
               <tr>
-                <!-- Left: Copy -->
-                <td class="stack-cols" width="50%" valign="top" style="padding:0 8px;">
-                  <!-- Title -->
-                  <h2 style="margin:0 0 10px 0;font-family:'Montserrat',Arial,Helvetica,sans-serif;font-size:26px;line-height:1.2;color:#111111;font-weight:300;">
-                    {{title}}
-                  </h2>
-
-                  <!-- Price -->
-                  <p style="margin:0 0 10px 0;font-family:'Montserrat',Arial,Helvetica,sans-serif;font-size:16px;line-height:1;color:#111111;font-weight:600;">
-                    {{priceHtml}}
-                  </p>
-
-                  <!-- Description -->
-                  <p style="margin:0 0 16px 0;font-family:'Montserrat',Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#333333;">
-                    {{description}}
-                  </p>
-
-                  <!-- CTA + Colours row -->
-                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;">
+                <td align="left" valign="middle" style="padding:0;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;" class="cta">
                     <tr>
-                      <!-- CTA (left) -->
-                      <td align="left" valign="middle" style="padding:0;">
-                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;">
-                          <tr>
-                            <td align="center" bgcolor="{{ctaBg}}" style="background:{{ctaBg}};">
-                              <a href="{{cta}}" target="_blank" style="display:inline-block;padding:12px 22px;font-family:'Montserrat',Arial,Helvetica,sans-serif;font-size:14px;line-height:14px;color:#ffffff;text-decoration:none;">
-                                {{ctaLabel}}
-                              </a>
-                            </td>
-                          </tr>
-                        </table>
-                      </td>
-                      <!-- Spacer -->
-                      <td width="12" style="font-size:0;line-height:0;">&nbsp;</td>
-                      <!-- Colours (right aligned) -->
-                      <td align="right" valign="middle" class="color-swatches" style="padding:0;">
-                        {{coloursHtml}}
+                      <td align="center" bgcolor="{{ctaBg}}" style="background:{{ctaBg}};">
+                        <a href="{{cta}}" target="_blank" style="display:inline-block;padding:12px 22px;font-family:Montserrat,Arial,Helvetica,sans-serif;font-size:14px;line-height:14px;color:#ffffff;text-decoration:none;">
+                          {{ctaLabel}}
+                        </a>
                       </td>
                     </tr>
                   </table>
-                  <!-- /CTA + Colours row -->
-
-                </td>
-
-                <!-- Right: Image -->
-                <td class="stack-cols" width="50%" valign="top" style="padding:0 8px;">
-                  <a href="{{cta}}" target="_blank" style="text-decoration:none;">
-                    <img src="{{image}}" alt="{{title}}" style="display:block;width:100%;height:auto;border:0;outline:0;text-decoration:none;-ms-interpolation-mode:bicubic;">
-                  </a>
                 </td>
               </tr>
             </table>
-            <!-- /Two Columns -->
+            <!-- /CTA row -->
+          </td>
+          <!-- Right: Image -->
+          <td class="stack-cols" width="50%" valign="top" style="padding:0px 0px 0px 12px;">
+            <a href="{{cta}}" target="_blank" style="text-decoration:none;">
+              <img src="{{image}}" alt="{{title}}" style="display:block;width:100%;height:auto;border:0;outline:0;text-decoration:none;-ms-interpolation-mode:bicubic;">
+            </a>
           </td>
         </tr>
       </table>
-      <!-- /Wrapper -->
+      <!-- /Two Columns -->
     </td>
   </tr>
 </table>
 <!-- === End: Product Feature Module === -->
-
-<!-- Mobile Stacking -->
 <style>
 @media only screen and (max-width: 600px) {
-  .stack-cols {
-    display:block !important;
-    width:100% !important;
-    padding:0 0 16px 0 !important;
-  }
-  .color-swatches {
-    text-align:right !important;
-  }
+  .stack-cols { display:block !important; width:100% !important; padding:0 0 16px 0 !important; }
+  .module-pad { padding:12px !important; }
+  .cta { width:100% !important; }
 }
 </style>`
   }

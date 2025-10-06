@@ -66,7 +66,7 @@ export const defaultHeroTemplates: HeroTemplate[] = [
   <tr>
     <td align="center" style="margin:0;padding:0;">
       <!-- Wrapper -->
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;margin:0 auto;background:#FFFFFF;padding:0px 25px 0px 25px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;margin:0 auto;background:#FFFFFF;padding:25px;">
         <tr>
           <td style="padding:0;">
             <a href="{{heroHref}}" target="_blank" style="display:block;text-decoration:none;">

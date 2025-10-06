@@ -1,6 +1,15 @@
 import React from 'react';
+import { Paper, IconButton, Tooltip } from '@mui/material';
 import { uniqueImages } from '../lib/imageUtils';
 import { ProductData } from '../lib/types';
+import { sanitizeEmailHtml, sanitizeInlineHtml } from '../lib/sanitize';
+import { inlineHtmlToParagraphHtml } from '../lib/htmlUtils';
+
+// Universal helper to render any field as sanitized HTML
+function renderSanitizedHtml(html: string, inline = false, fallback = ''): { __html: string } {
+  if (!html) return { __html: fallback };
+  return { __html: inline ? sanitizeInlineHtml(html) : sanitizeEmailHtml(html) };
+}
 
 interface EditableModuleProps {
   product: ProductData;
@@ -22,6 +31,7 @@ const EditableModule: React.FC<EditableModuleProps> = ({
   orientation,
   updateProduct
 }) => {
+  // No formatting toolbar: preview allows copy edits only; styles must be adjusted in the right panel
   // Determine whether to reverse the flex order based on orientation.
   const isReverse = orientation === 'right-image';
 
@@ -67,18 +77,19 @@ const EditableModule: React.FC<EditableModuleProps> = ({
       </div>
       {/* Text column */}
       <div className="content">
-        {/* Title */}
-          <div
-            className="title"
-            contentEditable
-            suppressContentEditableWarning
-            onBlur={(e) => {
-              const text = e.currentTarget.innerText.replace(/\n$/, '');
-              updateProduct(index, 'title', text);
-            }}
-          >
-            {product.title || 'Product title'}
-          </div>
+        {/* Title (copy-only) */}
+        <div
+          className="title"
+          contentEditable
+          tabIndex={0}
+          suppressContentEditableWarning
+          onInput={(e) => {
+            // Copy-only: strip formatting and save as <p> with <br>
+            const el = e.currentTarget as HTMLElement;
+            updateProduct(index, 'title', inlineHtmlToParagraphHtml(el.innerHTML || ''));
+          }}
+          dangerouslySetInnerHTML={renderSanitizedHtml(product.title, true, 'Product title')}
+        />
         {/* Price: show original price if available (non‑editable) and sale price editable */}
         <div className="price">
           {product.originalPrice && (
@@ -89,36 +100,42 @@ const EditableModule: React.FC<EditableModuleProps> = ({
           <span
             className="sale-price"
             contentEditable
+            tabIndex={0}
             suppressContentEditableWarning
-            onBlur={(e) => {
-              const value = e.currentTarget.innerText.replace(/\$/g, '').trim();
+            onInput={(e) => {
+              const value = (e.currentTarget as HTMLElement).innerText.replace(/\$/g, '').trim();
               updateProduct(index, 'price', value);
             }}
-          >
-            {product.price ? '$' + product.price : 'Price'}
-          </span>
-        </div>
-        {/* Description */}
-          <div
-            className="description"
-            contentEditable
-            suppressContentEditableWarning
-            onBlur={(e) => {
-              const text = e.currentTarget.innerText.replace(/\n$/, '');
-              const html = text.replace(/\n/g, '<br>');
-              updateProduct(index, 'description', html);
-            }}
-            dangerouslySetInnerHTML={{ __html: product.description || 'Description' }}
+            dangerouslySetInnerHTML={renderSanitizedHtml(product.price ? '$' + product.price : '', true, 'Price')}
           />
+        </div>
+        {/* Description (copy-only) */}
+        <div
+          className="description"
+          contentEditable
+          tabIndex={0}
+          suppressContentEditableWarning
+          onInput={(e) => {
+            const el = e.currentTarget as HTMLElement;
+            updateProduct(index, 'description', inlineHtmlToParagraphHtml(el.innerHTML || ''));
+          }}
+          dangerouslySetInnerHTML={renderSanitizedHtml(product.description, false, 'Description')}
+        />
         <div className="cta-row">
           <a
             href={product.cta || product.url}
-            className="button"
+            className="button cta-label"
             target="_blank"
             rel="noopener noreferrer"
-          >
-            SHOP NOW
-          </a>
+            contentEditable
+            tabIndex={0}
+            suppressContentEditableWarning
+            onInput={(e) => {
+              const html = ((e.currentTarget as HTMLElement).innerHTML || '').trim() || 'SHOP NOW';
+              updateProduct(index, 'ctaLabel', html);
+            }}
+            dangerouslySetInnerHTML={renderSanitizedHtml(product.ctaLabel || 'SHOP NOW', true)}
+          />
         </div>
       </div>
       {/* Image selector modal */}
