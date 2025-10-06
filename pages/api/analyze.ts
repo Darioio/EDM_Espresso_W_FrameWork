@@ -266,6 +266,61 @@ function extractLogo($: cheerio.CheerioAPI, base: string): { url?: string; svg?:
   const cand = $('img[alt*="logo" i], img[class*="logo" i]').first();
   const fallback = cand.attr('src') || cand.attr('data-src') || '';
   if (fallback) return { url: absoluteUrl(base, fallback) };
+
+  // Deep scan: look for header region then pick an <a> linking to root with an <img>
+  try {
+    const origin = new URL(base).origin;
+    // Candidate header containers
+    const headerSelectors = ['header', '[class*="header" i]', '[id*="header" i]', 'nav', '[class*="topbar" i]'];
+    const $header = $(headerSelectors.join(','));
+    if ($header && $header.length) {
+      // Find image inside anchor linking to root or homepage
+      const anchors = $header.find('a[href]');
+      for (const a of anchors.toArray()) {
+        const $a = $(a);
+        const href = ($a.attr('href') || '').trim();
+        if (!href) continue;
+        let absHref = href;
+        try { absHref = new URL(href, origin).toString(); } catch {}
+        if (absHref === origin + '/' || absHref === origin) {
+          const img = $a.find('img').first();
+          if (img && img.length) {
+            let src = img.attr('src') || img.attr('data-src') || img.attr('data-lazy') || '';
+            src = absoluteUrl(base, src);
+            if (src) return { url: src };
+          }
+          const svg = $a.find('svg').first();
+          if (svg && svg.length) {
+            const html = $.html(svg);
+            if (html) return { svg: html };
+          }
+        }
+      }
+    }
+  } catch {}
+
+  // Heuristic: largest image near top of body within first 10 images (often the logo if above fails)
+  try {
+    const imgs = $('img').slice(0, 10).toArray();
+  // Using 'any' for node reference to avoid tight coupling to cheerio internal types across versions
+  let best: { el: any; score: number; src: string } | null = null;
+    for (const el of imgs) {
+      const $img = $(el as any);
+      let src = $img.attr('src') || $img.attr('data-src') || '';
+      if (!src) continue;
+      src = absoluteUrl(base, src);
+      // Skip tracking pixels / sprites
+      if (/\.gif$/i.test(src) || /sprite/i.test(src) || /loading|placeholder/i.test(src)) continue;
+      const w = parseInt($img.attr('width') || '0', 10);
+      const h = parseInt($img.attr('height') || '0', 10);
+      const area = (isNaN(w) || isNaN(h) ? 0 : w * h);
+      // Penalize huge banner-like images (very wide and tall)
+      const penalty = (w > 800 && h > 300) ? 0.2 : 1;
+      const score = (area || 0) * penalty;
+      if (!best || score > best.score) best = { el, score, src };
+    }
+    if (best && best.src) return { url: best.src };
+  } catch {}
   return {};
 }
 

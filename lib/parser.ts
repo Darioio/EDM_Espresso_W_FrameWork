@@ -60,7 +60,47 @@ function getMeta($: cheerio.CheerioAPI, prop: string): string | null {
  *
  * @param url Product page URL
  */
-export async function parseProduct(url: string): Promise<ProductData> {
+// Rotating modern user agents for retry strategy
+const USER_AGENTS = [
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'
+];
+
+async function fetchWithRetries(url: string, max = 3): Promise<{ html: string; status: number }> {
+  let lastErr: any;
+  for (let attempt = 1; attempt <= max; attempt++) {
+    const ua = USER_AGENTS[(attempt - 1) % USER_AGENTS.length];
+    try {
+      const res = await axios.get(url, {
+        headers: {
+          'User-Agent': ua,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'Referer': new URL(url).origin + '/'
+        },
+        maxRedirects: 5,
+        timeout: 12000,
+        validateStatus: s => s < 500 || s === 503 || s === 429
+      });
+      if (res.status === 200) return { html: res.data, status: res.status };
+      if ([429, 403, 503].includes(res.status) && attempt < max) {
+        await new Promise(r => setTimeout(r, 350 * Math.pow(2, attempt - 1)));
+        continue;
+      }
+      return { html: res.data, status: res.status };
+    } catch (e) {
+      lastErr = e;
+      if (attempt === max) throw e;
+      await new Promise(r => setTimeout(r, 350 * Math.pow(2, attempt - 1)));
+    }
+  }
+  throw lastErr;
+}
+
+export async function parseProduct(url: string): Promise<ProductData & { __fetchStatus?: number; __reason?: string }> {
   const clean = (value: string | null | undefined): string =>
     (value || '').toString().trim();
 
@@ -85,17 +125,11 @@ export async function parseProduct(url: string): Promise<ProductData> {
   const normalise = buildNormaliser(url);
 
   let html = '';
+  let status = 0;
   try {
-    const response = await axios.get(url, {
-      headers: {
-        // Set a user agent so that some sites don’t block our request.
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0 Safari/537.36'
-      },
-      // Follow redirects automatically.
-      maxRedirects: 3
-    });
-    html = response.data;
+    const fetched = await fetchWithRetries(url, 3);
+    html = fetched.html;
+    status = fetched.status;
   } catch (error) {
     console.error(`Failed to fetch ${url}:`, error instanceof Error ? error.message : error);
     return {
@@ -107,8 +141,10 @@ export async function parseProduct(url: string): Promise<ProductData> {
       image: '',
       images: undefined,
       cta: url,
-      ctaLabel: 'SHOP NOW'
-    } as ProductData;
+      ctaLabel: 'SHOP NOW',
+      __fetchStatus: status || 0,
+      __reason: 'fetch-failed'
+    } as any;
   }
 
   const $ = cheerio.load(html);
@@ -123,7 +159,7 @@ export async function parseProduct(url: string): Promise<ProductData> {
   // provides the richest information. We fall back to meta tags if
   // structured data is not present or incomplete.
   const ld = parseLdJson($) || {};
-  const product: ProductData = {
+  const product: ProductData & { __fetchStatus?: number; __reason?: string } = {
     url,
     pretitle: '',
     title: '',
@@ -140,6 +176,7 @@ export async function parseProduct(url: string): Promise<ProductData> {
     // will fall back to this value.
     ctaLabel: 'SHOP NOW'
   };
+  product.__fetchStatus = status;
 
   // Title
   product.title =
@@ -189,11 +226,32 @@ export async function parseProduct(url: string): Promise<ProductData> {
     : typeof ld.image === 'string'
     ? ld.image
     : undefined;
+  // Collect possible image candidates including lazy attrs & srcset
+  const firstImg = $('img').first();
+  const srcset = firstImg.attr('srcset');
+  let srcsetPick = '';
+  if (srcset) {
+    try {
+      // choose largest descriptor
+      const parts = srcset.split(',').map(p => p.trim());
+      let bestW = -1;
+      for (const part of parts) {
+        const m = part.match(/\s+(\d+)[wx]$/);
+        const urlPart = part.replace(/\s+(\d+)[wx]$/, '').trim();
+        const w = m ? parseInt(m[1], 10) : 0;
+        if (w > bestW) { bestW = w; srcsetPick = urlPart; }
+      }
+    } catch {}
+  }
   product.image = normalise(
     clean(ldImage) ||
+      clean(getMeta($, 'og:image:secure_url')) ||
       clean(getMeta($, 'og:image')) ||
       clean(getMeta($, 'twitter:image')) ||
-      clean($('img').first().attr('src'))
+      clean(firstImg.attr('data-src')) ||
+      clean(firstImg.attr('data-lazy')) ||
+      clean(srcsetPick) ||
+      clean(firstImg.attr('src'))
   );
 
   // Price
@@ -400,5 +458,30 @@ export async function parseProduct(url: string): Promise<ProductData> {
     product.images = deduped;
   }
 
+  // If we failed structured extraction, attempt embedded script datasets (Next.js / Nuxt / etc.)
+  try {
+    if (!product.title) {
+  const nextMatch = html.match(/__NEXT_DATA__\s*=\s*(\{[\s\S]*?\})\s*<\/script>/);
+      if (nextMatch) {
+        try {
+          const obj = JSON.parse(nextMatch[1]);
+          const str = JSON.stringify(obj);
+          // naive find of product title keys
+          const titleMatch = str.match(/"title"\s*:\s*"([^"]{5,})"/);
+          if (titleMatch) product.title = clean(titleMatch[1]);
+        } catch {}
+      }
+    }
+  } catch {}
+
+  // Mark reason if nothing meaningful
+  const meaningfulKeys = ['title','description','image','price','originalPrice','images','pretitle'];
+  const hasInfo = meaningfulKeys.some(k => {
+    const v: any = (product as any)[k];
+    return Array.isArray(v) ? v.length > 0 : Boolean(v && String(v).trim());
+  });
+  if (!hasInfo) {
+    product.__reason = product.__reason || (product.__fetchStatus && [403,429].includes(product.__fetchStatus) ? 'blocked' : 'empty');
+  }
   return product;
 }

@@ -163,6 +163,7 @@ import TouchRipple from '@mui/material/ButtonBase/TouchRipple';
 interface GenerateResponse {
   html: string;
   products: any[];
+  skipped?: { url: string; reason: string }[];
 }
 // nested component remounts from capturing local versions
 const sanitizeUrl = (url: string) => (url || '').split('?')[0];
@@ -2337,8 +2338,33 @@ const toggleCodeSection = (key: string) => {
    * uploaded the HTML is returned unchanged.
    */
   const applyBrandLogo = (html: string): string => {
-    if (!brandLogoDataUrl) return html;
-    return html.replace(/<img([^>]+)src="[^">]*"/, `<img$1src="${brandLogoDataUrl}"`);
+    if (!html) return html;
+    // Replace first img src with uploaded logo (if any)
+    let out = html;
+    if (brandLogoDataUrl) {
+      out = out.replace(/<img([^>]+)src="[^">]*"/, `<img$1src="${brandLogoDataUrl}"`);
+    }
+    // Derive alt text preference order: analyzeData.storeName -> brandName -> existing alt
+    let desiredAlt = (analyzeData?.storeName || brandName || '').trim();
+    if (!desiredAlt) {
+      try {
+        const host = new URL(brandUrlInput || brandWebsite || '').hostname.replace(/^www\./,'');
+        desiredAlt = host.split('.')[0];
+      } catch {}
+    }
+    if (desiredAlt) {
+      out = out.replace(/<img([^>]*?)alt="[^"]*"([^>]*)>/, (m, pre, post) => `<img${pre}alt="${desiredAlt}"${post}>`)
+               .replace(/<img((?:(?!alt=)[^>])*)>/, (m, rest) => `<img${rest} alt="${desiredAlt}">`); // if no alt present
+    }
+    // Ensure the enclosing anchor (if logo wrapped in <a>) points to brandWebsite or base of current URL
+    const siteHref = brandWebsite || (() => {
+      try { return new URL(brandUrlInput).origin; } catch { return ''; }
+    })();
+    if (siteHref) {
+      // Update first anchor that contains the (possibly replaced) img
+      out = out.replace(/<a([^>]*?)href="[^"]*"([^>]*>)\s*<img/i, `<a$1href="${siteHref}"$2<img`);
+    }
+    return out;
   };
 
   // Inject announcement copy (if available) into the header template.
@@ -3754,7 +3780,14 @@ const toggleCodeSection = (key: string) => {
       }));
       // Surface any missing URLs as notifications (non-blocking)
       if (missingUrls.length) {
-        missingUrls.forEach(m => addNotification(`No data returned for URL: ${m}`));
+        // If API supplied skip reasons, map them
+        const skipMap = new Map<string, string>();
+        data.skipped?.forEach(s => skipMap.set(s.url.split('?')[0], s.reason));
+        missingUrls.forEach(m => {
+          const reason = skipMap.get(m) || 'no-data';
+          const msg = reason === 'blocked' ? 'Blocked / rate limited' : reason === 'fetch-failed' ? 'Fetch failed' : reason === 'no-meaningful-fields' ? 'No meaningful fields' : reason;
+          addNotification(`No data for URL: ${m} (${msg})`);
+        });
       }
       // Hide after a short delay to avoid flicker, then reset
       setTimeout(() => {
