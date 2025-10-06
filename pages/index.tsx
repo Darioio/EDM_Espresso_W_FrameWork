@@ -130,6 +130,7 @@ import DownloadIcon from '@mui/icons-material/Download';
 // Floating formatting icons removed for preview copy-only behavior
 import {
   DndContext,
+  DragOverlay,
   closestCenter,
   PointerSensor,
   useSensor,
@@ -732,17 +733,36 @@ export default function Home() {
   // ProductUrlFields moved to module scope above
 
   const SortableBodySection: React.FC<{ section: BodySection; isOpen: boolean }> = ({ section, isOpen }) => {
-    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: `body-${section.id}` });
+    // Include isDragging to apply visual affordances (shadow, opacity) consistent with hero/banner sections
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `body-${section.id}` });
     const { ['aria-describedby']: _ariaDescribedBy, ...sortableAttributes } = attributes as any;
-    const style = { transform: CSS.Transform.toString(transform), transition } as React.CSSProperties;
+    const translate = CSS.Transform.toString(transform);
+    const style: React.CSSProperties = {
+      transform: translate ? `${translate} translateZ(0)` : undefined,
+      transition,
+      borderRadius: 5,
+      willChange: 'transform',
+      position: 'relative',
+      background: 'var(--panel-bg, #fff)',
+      boxShadow: isDragging ? '0 6px 18px rgba(0,0,0,0.18)' : undefined,
+      zIndex: isDragging ? 1200 : undefined,
+      opacity: isDragging ? 0.97 : 1,
+      pointerEvents: isDragging ? 'none' : 'auto'
+    };
 
     // Stable handler so PaddingControls.onChange identity doesn't change across renders
     const handlePaddingChange = useCallback((p: PaddingValue) => setBodySectionPadding(section.id, p), [section.id, setBodySectionPadding]);
     return (
-  <div ref={setNodeRef} style={{ ...style, borderRadius: 5 }}>
+  <div ref={setNodeRef} style={style}>
         <SectionAccordion
           id={`left-body-${section.id}`}
-          title={section.name}
+          title={renamingId===`body-${section.id}` ? (
+            <Box sx={{ display:'flex', alignItems:'center', gap:1, width:'100%' }} onClick={(e)=>e.stopPropagation()}>
+              <TextField size="small" autoFocus value={renameDraft} onChange={(e)=>setRenameDraft(e.target.value)} onKeyDown={(e)=>{ if(e.key==='Enter'){ commitRename(); } else if(e.key==='Escape'){ cancelRename(); } }} variant="standard" placeholder={section.name || 'Body Section'} sx={{ flex:1 }} />
+              <IconButton size="small" onClick={(e)=>{ e.stopPropagation(); commitRename(); }}><SaveIcon fontSize="small" /></IconButton>
+              <IconButton size="small" onClick={(e)=>{ e.stopPropagation(); cancelRename(); }}><CloseIcon2 fontSize="small" /></IconButton>
+            </Box>
+          ) : (sectionTitles[`body-${section.id}`] || section.name)}
           expanded={isOpen}
           onToggle={() => handleAccordionToggle(`body-${section.id}`)}
           startAdornment={
@@ -767,6 +787,7 @@ export default function Home() {
                   { label: 'Move up', icon: <ArrowUpwardIcon fontSize="small" />, disabled: idx <= 0, onClick: () => moveSectionUp(key) },
                   { label: 'Move down', icon: <ArrowDownwardIcon fontSize="small" />, disabled: idx === -1 || idx >= sectionOrder.length - 1, onClick: () => moveSectionDown(key) },
                   { label: 'Clone', icon: <ContentCopyIcon fontSize="small" />, onClick: () => cloneBodySection(section.id) },
+                  { label: 'Rename', icon: <EditIcon fontSize="small" />, onClick: () => beginRename(`body-${section.id}`, sectionTitles[`body-${section.id}`] || section.name) },
                   { label: 'Delete', icon: <DeleteIcon fontSize="small" />, onClick: () => removeBodySection(section.id) },
                 ];
               })()}
@@ -989,14 +1010,32 @@ export default function Home() {
   );
 
   const SortableHeroSection: React.FC<{ isOpen: boolean }> = ({ isOpen }) => {
-    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: 'hero' });
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: 'hero' });
     const { ['aria-describedby']: _ariaDescribedBy, ...sortableAttributes } = attributes as any;
-    const style = { transform: CSS.Transform.toString(transform), transition } as React.CSSProperties;
+    const translate = CSS.Transform.toString(transform);
+    const style: React.CSSProperties = {
+      transform: translate ? `${translate} translateZ(0)` : undefined,
+      transition,
+      borderRadius:5,
+      willChange:'transform',
+      position:'relative',
+      background:'var(--panel-bg, #fff)',
+      boxShadow: isDragging ? '0 6px 18px rgba(0,0,0,0.18)' : undefined,
+      zIndex: isDragging ? 1200 : undefined,
+      opacity: isDragging ? 0.97 : 1,
+      pointerEvents: isDragging ? 'none' : 'auto'
+    };
     return (
-  <div ref={setNodeRef} style={{ ...style, borderRadius: 5 }}>
+  <div ref={setNodeRef} style={style}>
         <SectionAccordion
           id={'left-hero'}
-          title={'Hero'}
+          title={renamingId==='hero' ? (
+            <Box sx={{ display:'flex', alignItems:'center', gap:1, width:'100%' }} onClick={(e)=>e.stopPropagation()}>
+              <TextField size="small" autoFocus value={renameDraft} onChange={(e)=>setRenameDraft(e.target.value)} onKeyDown={(e)=>{ if(e.key==='Enter'){ commitRename(); } else if(e.key==='Escape'){ cancelRename(); } }} variant="standard" placeholder="Hero" sx={{ flex:1 }} />
+              <IconButton size="small" onClick={(e)=>{ e.stopPropagation(); commitRename(); }}><SaveIcon fontSize="small" /></IconButton>
+              <IconButton size="small" onClick={(e)=>{ e.stopPropagation(); cancelRename(); }}><CloseIcon2 fontSize="small" /></IconButton>
+            </Box>
+          ) : resolveTitle('hero')}
           expanded={isOpen}
           onToggle={() => handleAccordionToggle('hero')}
           startAdornment={
@@ -1019,7 +1058,8 @@ export default function Home() {
                 return [
                   { label: 'Move up', icon: <ArrowUpwardIcon fontSize="small" />, disabled: idx <= 0, onClick: () => moveSectionUp('hero') },
                   { label: 'Move down', icon: <ArrowDownwardIcon fontSize="small" />, disabled: idx === -1 || idx >= sectionOrder.length - 1, onClick: () => moveSectionDown('hero') },
-                  { label: 'Clone', icon: <ContentCopyIcon fontSize="small" />, disabled: true },
+                  { label: 'Clone', icon: <ContentCopyIcon fontSize="small" />, onClick: () => cloneHeroSection() },
+                  { label: 'Rename', icon: <EditIcon fontSize="small" />, onClick: () => beginRename('hero', resolveTitle('hero')) },
                   { label: 'Delete', icon: <DeleteIcon fontSize="small" />, onClick: () => removeHeroSection() },
                 ];
               })()}
@@ -1146,14 +1186,32 @@ export default function Home() {
   };
 
   const SortableBannerSection: React.FC<{ isOpen: boolean }> = ({ isOpen }) => {
-    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: 'banner' });
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: 'banner' });
     const { ['aria-describedby']: _ariaDescribedBy, ...sortableAttributes } = attributes as any;
-    const style = { transform: CSS.Transform.toString(transform), transition } as React.CSSProperties;
+    const translate = CSS.Transform.toString(transform);
+    const style: React.CSSProperties = {
+      transform: translate ? `${translate} translateZ(0)` : undefined,
+      transition,
+      borderRadius:5,
+      willChange:'transform',
+      position:'relative',
+      background:'var(--panel-bg, #fff)',
+      boxShadow: isDragging ? '0 6px 18px rgba(0,0,0,0.18)' : undefined,
+      zIndex: isDragging ? 1200 : undefined,
+      opacity: isDragging ? 0.97 : 1,
+      pointerEvents: isDragging ? 'none' : 'auto'
+    };
     return (
-  <div ref={setNodeRef} style={{ ...style, borderRadius: 5 }}>
+  <div ref={setNodeRef} style={style}>
         <SectionAccordion
           id={'left-banner'}
-          title={'Banner'}
+          title={renamingId==='banner' ? (
+            <Box sx={{ display:'flex', alignItems:'center', gap:1, width:'100%' }} onClick={(e)=>e.stopPropagation()}>
+              <TextField size="small" autoFocus value={renameDraft} onChange={(e)=>setRenameDraft(e.target.value)} onKeyDown={(e)=>{ if(e.key==='Enter'){ commitRename(); } else if(e.key==='Escape'){ cancelRename(); } }} variant="standard" placeholder="Banner" sx={{ flex:1 }} />
+              <IconButton size="small" onClick={(e)=>{ e.stopPropagation(); commitRename(); }}><SaveIcon fontSize="small" /></IconButton>
+              <IconButton size="small" onClick={(e)=>{ e.stopPropagation(); cancelRename(); }}><CloseIcon2 fontSize="small" /></IconButton>
+            </Box>
+          ) : resolveTitle('banner')}
           expanded={isOpen}
           onToggle={() => handleAccordionToggle('banner')}
           startAdornment={
@@ -1176,7 +1234,8 @@ export default function Home() {
                 return [
                   { label: 'Move up', icon: <ArrowUpwardIcon fontSize="small" />, disabled: idx <= 0, onClick: () => moveSectionUp('banner') },
                   { label: 'Move down', icon: <ArrowDownwardIcon fontSize="small" />, disabled: idx === -1 || idx >= sectionOrder.length - 1, onClick: () => moveSectionDown('banner') },
-                  { label: 'Clone', icon: <ContentCopyIcon fontSize="small" />, disabled: true },
+                  { label: 'Clone', icon: <ContentCopyIcon fontSize="small" />, onClick: () => cloneBannerSection() },
+                  { label: 'Rename', icon: <EditIcon fontSize="small" />, onClick: () => beginRename('banner', resolveTitle('banner')) },
                   { label: 'Delete', icon: <DeleteIcon fontSize="small" />, onClick: () => removeBannerSection() },
                 ];
               })()}
@@ -1302,6 +1361,211 @@ export default function Home() {
 
   const MemoizedSortableHeroSection = React.memo(SortableHeroSection);
   const MemoizedSortableBannerSection = React.memo(SortableBannerSection);
+  const SortableHeroCloneSection: React.FC<{ clone: HeroClone; isOpen: boolean }> = ({ clone, isOpen }) => {
+    const id = `hero-clone-${clone.id}`;
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+    const { ['aria-describedby']: _ariaDescribedBy, ...sortableAttributes } = attributes as any;
+    const translate = CSS.Transform.toString(transform);
+    const style: React.CSSProperties = {
+      transform: translate ? `${translate} translateZ(0)` : undefined,
+      transition,
+      borderRadius:5,
+      willChange:'transform',
+      position:'relative',
+      background:'var(--panel-bg, #fff)',
+      boxShadow: isDragging ? '0 6px 18px rgba(0,0,0,0.18)' : undefined,
+      zIndex: isDragging ? 1200 : undefined,
+      opacity: isDragging ? 0.97 : 1,
+      pointerEvents: isDragging ? 'none' : 'auto'
+    };
+    return (
+      <div ref={setNodeRef} style={style}>
+        <SectionAccordion
+          id={`left-${id}`}
+          title={renamingId===id ? (
+            <Box sx={{ display:'flex', alignItems:'center', gap:1, width:'100%' }} onClick={(e)=>e.stopPropagation()}>
+              <TextField size="small" autoFocus value={renameDraft} onChange={(e)=>setRenameDraft(e.target.value)} onKeyDown={(e)=>{ if(e.key==='Enter'){ commitRename(); } else if(e.key==='Escape'){ cancelRename(); } }} variant="standard" placeholder={`${resolveTitle(id)} ${clone.id}`} sx={{ flex:1 }} />
+              <IconButton size="small" onClick={(e)=>{ e.stopPropagation(); commitRename(); }}><SaveIcon fontSize="small" /></IconButton>
+              <IconButton size="small" onClick={(e)=>{ e.stopPropagation(); cancelRename(); }}><CloseIcon2 fontSize="small" /></IconButton>
+            </Box>
+          ) : (sectionTitles[id] ? sectionTitles[id] : `${resolveTitle(id)} ${clone.id}`)}
+          expanded={isOpen}
+          onToggle={() => handleAccordionToggle(id)}
+          startAdornment={
+            <IconButton component="span" size="small" {...sortableAttributes} {...listeners} onClick={(e)=>e.stopPropagation()} title="Reorder clone"><DragIndicatorIcon fontSize="small" /></IconButton>
+          }
+          actions={<MoreActions size="medium" items={(()=>{ const idx = sectionOrder.indexOf(id); return [
+            { label:'Move up', icon:<ArrowUpwardIcon fontSize='small' />, disabled: idx <= 0, onClick:()=> moveSectionUp(id) },
+            { label:'Move down', icon:<ArrowDownwardIcon fontSize='small' />, disabled: idx === -1 || idx >= sectionOrder.length -1, onClick:()=> moveSectionDown(id) },
+            { label:'Clone', icon:<ContentCopyIcon fontSize='small' />, onClick:()=> cloneHeroSection() },
+            { label:'Rename', icon:<EditIcon fontSize='small' />, onClick:()=> beginRename(id, sectionTitles[id] || `${resolveTitle(id)} ${clone.id}`) },
+            { label:'Delete', icon:<DeleteIcon fontSize='small' />, onClick:() => removeHeroClone(clone.id) }
+          ]; })()} />}
+          detailsSx={{ pt:1 }}
+        >
+          <Box sx={{ display:'flex', flexDirection:'column', gap:1.25 }}>
+            {/* Image preview */}
+            {clone.image ? (
+              <div style={{ marginBottom:'0.5rem' }}>
+                <img src={clone.image} alt={clone.alt || ''} style={{ width:'100%', height:'auto', border:'1px solid rgba(0,0,0,0.2)', borderRadius:6, overflow:'hidden' }} />
+              </div>
+            ) : (
+              <Typography variant="caption" sx={{ color:'text.secondary' }}>No hero image selected.</Typography>
+            )}
+            {/* Template row */}
+            <div style={{ display:'flex', gap:'var(--gap-2)', alignItems:'center', marginTop:'0.25rem' }}>
+              <LabeledSelect idBase={`hero-clone-template-${clone.id}`} label="Template" value={clone.templateId} onChange={(e)=>updateHeroCloneField(clone.id,'templateId', String(e.target.value))}>
+                {heroTemplates.map(t => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+              </LabeledSelect>
+            </div>
+            {/* Hero Link URL */}
+            <TextField
+              size="small"
+              label="Hero Link URL"
+              value={clone.href}
+              onChange={(e)=>updateHeroCloneField(clone.id,'href', sanitizeUrl(e.target.value))}
+              fullWidth
+              variant="standard"
+              sx={{ mt:1, '& .MuiInput-underline:before': { borderBottomColor:'grey.400' }, '& .MuiInput-underline:after': { borderBottomColor:'var(--color-primary)' } }}
+            />
+            {/* Hero Alt Text */}
+            <TextField
+              size="small"
+              label="Hero Alt Text"
+              value={clone.alt}
+              onChange={(e)=>updateHeroCloneField(clone.id,'alt', e.target.value)}
+              fullWidth
+              variant="standard"
+              sx={{ mt:1, '& .MuiInput-underline:before': { borderBottomColor:'grey.400' }, '& .MuiInput-underline:after': { borderBottomColor:'var(--color-primary)' } }}
+            />
+            {/* Advanced settings (shared padding note) */}
+            <Button
+              variant="text"
+              size="small"
+              onClick={() => handleAdvancedToggle(id)}
+              endIcon={<ExpandMoreIcon sx={{ transform: isAdvancedOpen(id) ? 'rotate(180deg)' : 'rotate(0deg)', transition:'transform 0.2s ease' }} />}
+              sx={{ alignSelf:'flex-start', mt:1, color:'rgba(0,0,0,0.6)', backgroundColor:'transparent', '&:hover': { backgroundColor:'rgba(0,0,0,0.05)' } }}
+            >
+              Advanced settings
+            </Button>
+            <Collapse in={isAdvancedOpen(id)} timeout="auto" unmountOnExit>
+              <Box sx={{ mt:1 }}>
+                <Divider sx={{ mb:1 }} />
+                <PaddingControls
+                  label="Section padding (px)"
+                  value={heroClonePaddings.get(clone.id) || heroPadding}
+                  onChange={(pad) => setHeroClonePaddings(p => { const m = new Map(p); m.set(clone.id, pad); return m; })}
+                  persistKey={`hero-clone:${clone.id}:padding`}
+                />
+              </Box>
+            </Collapse>
+            {/* Inline delete button removed per request */}
+          </Box>
+        </SectionAccordion>
+      </div>
+    );
+  };
+  const SortableBannerCloneSection: React.FC<{ clone: BannerClone; isOpen: boolean }> = ({ clone, isOpen }) => {
+    const id = `banner-clone-${clone.id}`;
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+    const { ['aria-describedby']: _ariaDescribedBy, ...sortableAttributes } = attributes as any;
+    const translate = CSS.Transform.toString(transform);
+    const style: React.CSSProperties = {
+      transform: translate ? `${translate} translateZ(0)` : undefined,
+      transition,
+      borderRadius:5,
+      willChange:'transform',
+      position:'relative',
+      background:'var(--panel-bg, #fff)',
+      boxShadow: isDragging ? '0 6px 18px rgba(0,0,0,0.18)' : undefined,
+      zIndex: isDragging ? 1200 : undefined,
+      opacity: isDragging ? 0.97 : 1,
+      pointerEvents: isDragging ? 'none' : 'auto'
+    };
+    return (
+      <div ref={setNodeRef} style={style}>
+        <SectionAccordion
+          id={`left-${id}`}
+          title={renamingId===id ? (
+            <Box sx={{ display:'flex', alignItems:'center', gap:1, width:'100%' }} onClick={(e)=>e.stopPropagation()}>
+              <TextField size="small" autoFocus value={renameDraft} onChange={(e)=>setRenameDraft(e.target.value)} onKeyDown={(e)=>{ if(e.key==='Enter'){ commitRename(); } else if(e.key==='Escape'){ cancelRename(); } }} variant="standard" placeholder={`${resolveTitle(id)} ${clone.id}`} sx={{ flex:1 }} />
+              <IconButton size="small" onClick={(e)=>{ e.stopPropagation(); commitRename(); }}><SaveIcon fontSize="small" /></IconButton>
+              <IconButton size="small" onClick={(e)=>{ e.stopPropagation(); cancelRename(); }}><CloseIcon2 fontSize="small" /></IconButton>
+            </Box>
+          ) : (sectionTitles[id] ? sectionTitles[id] : `${resolveTitle(id)} ${clone.id}`)}
+          expanded={isOpen}
+          onToggle={() => handleAccordionToggle(id)}
+          startAdornment={
+            <IconButton component="span" size="small" {...sortableAttributes} {...listeners} onClick={(e)=>e.stopPropagation()} title="Reorder clone"><DragIndicatorIcon fontSize="small" /></IconButton>
+          }
+          actions={<MoreActions size="medium" items={(()=>{ const idx = sectionOrder.indexOf(id); return [
+            { label:'Move up', icon:<ArrowUpwardIcon fontSize='small' />, disabled: idx <= 0, onClick:()=> moveSectionUp(id) },
+            { label:'Move down', icon:<ArrowDownwardIcon fontSize='small' />, disabled: idx === -1 || idx >= sectionOrder.length -1, onClick:()=> moveSectionDown(id) },
+            { label:'Clone', icon:<ContentCopyIcon fontSize='small' />, onClick:()=> cloneBannerSection() },
+            { label:'Rename', icon:<EditIcon fontSize='small' />, onClick:()=> beginRename(id, sectionTitles[id] || `${resolveTitle(id)} ${clone.id}`) },
+            { label:'Delete', icon:<DeleteIcon fontSize='small' />, onClick:() => removeBannerClone(clone.id) }
+          ]; })()} />}
+          detailsSx={{ pt:1 }}
+        >
+          <Box sx={{ display:'flex', flexDirection:'column', gap:1.25 }}>
+            {clone.image ? (
+              <div style={{ marginBottom:'0.5rem' }}>
+                <img src={clone.image} alt={clone.alt || ''} style={{ width:'100%', height:'auto', border:'1px solid rgba(0,0,0,0.2)', borderRadius:6, overflow:'hidden' }} />
+              </div>
+            ) : (
+              <Typography variant="caption" sx={{ color:'text.secondary' }}>No banner image selected.</Typography>
+            )}
+            <div style={{ display:'flex', gap:'var(--gap-2)', alignItems:'center', marginTop:'0.25rem' }}>
+              <LabeledSelect idBase={`banner-clone-template-${clone.id}`} label="Template" value={clone.templateId} onChange={(e)=>updateBannerCloneField(clone.id,'templateId', String(e.target.value))}>
+                {bannerTemplates.map(t => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+              </LabeledSelect>
+            </div>
+            <TextField
+              size="small"
+              label="Banner Link URL"
+              value={clone.href}
+              onChange={(e)=>updateBannerCloneField(clone.id,'href', sanitizeUrl(e.target.value))}
+              fullWidth
+              variant="standard"
+              sx={{ mt:1, '& .MuiInput-underline:before': { borderBottomColor:'grey.400' }, '& .MuiInput-underline:after': { borderBottomColor:'var(--color-primary)' } }}
+            />
+            <TextField
+              size="small"
+              label="Banner Alt Text"
+              value={clone.alt}
+              onChange={(e)=>updateBannerCloneField(clone.id,'alt', e.target.value)}
+              fullWidth
+              variant="standard"
+              sx={{ mt:1, '& .MuiInput-underline:before': { borderBottomColor:'grey.400' }, '& .MuiInput-underline:after': { borderBottomColor:'var(--color-primary)' } }}
+            />
+            <Button
+              variant="text"
+              size="small"
+              onClick={() => handleAdvancedToggle(id)}
+              endIcon={<ExpandMoreIcon sx={{ transform: isAdvancedOpen(id) ? 'rotate(180deg)' : 'rotate(0deg)', transition:'transform 0.2s ease' }} />}
+              sx={{ alignSelf:'flex-start', mt:1, color:'rgba(0,0,0,0.6)', backgroundColor:'transparent', '&:hover': { backgroundColor:'rgba(0,0,0,0.05)' } }}
+            >
+              Advanced settings
+            </Button>
+            <Collapse in={isAdvancedOpen(id)} timeout="auto" unmountOnExit>
+              <Box sx={{ mt:1 }}>
+                <Divider sx={{ mb:1 }} />
+                <PaddingControls
+                  label="Section padding (px)"
+                  value={bannerClonePaddings.get(clone.id) || bannerPadding}
+                  onChange={(pad) => setBannerClonePaddings(p => { const m = new Map(p); m.set(clone.id, pad); return m; })}
+                  persistKey={`banner-clone:${clone.id}:padding`}
+                />
+              </Box>
+            </Collapse>
+            {/* Inline delete button removed per request */}
+          </Box>
+        </SectionAccordion>
+      </div>
+    );
+  };
+  const MemoizedSortableHeroCloneSection = React.memo(SortableHeroCloneSection);
+  const MemoizedSortableBannerCloneSection = React.memo(SortableBannerCloneSection);
 
   /**
    * Body templates and selection state. Body templates define
@@ -1584,6 +1848,88 @@ const [finalHtml, setFinalHtml] = useState('');
   const [bannerPadding, setBannerPadding] = useState<PaddingValue>({ top: 0, right: 0, bottom: 0, left: 0 });
   const [footerPadding, setFooterPadding] = useState<PaddingValue>({ top: 0, right: 0, bottom: 0, left: 0 });
   const [bodySectionPaddings, setBodySectionPaddings] = useState<Map<number, PaddingValue>>(new Map());
+  // Independent clone paddings
+  const [heroClonePaddings, setHeroClonePaddings] = useState<Map<number, PaddingValue>>(new Map());
+  const [bannerClonePaddings, setBannerClonePaddings] = useState<Map<number, PaddingValue>>(new Map());
+  // Editable section titles
+  const [sectionTitles, setSectionTitles] = useState<Record<string,string>>({});
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
+  // Active section id currently being dragged (for DragOverlay rendering)
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const beginRename = (id: string, current: string) => { setRenamingId(id); setRenameDraft(current); };
+  const commitRename = () => {
+    if (renamingId) {
+      setSectionTitles(prev => ({ ...prev, [renamingId]: renameDraft.trim() || prev[renamingId] || defaultTitleFor(renamingId) }));
+      setRenamingId(null); setRenameDraft('');
+    }
+  };
+  const cancelRename = () => { setRenamingId(null); setRenameDraft(''); };
+  // Load persisted titles & clone paddings
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return;
+      const savedTitles = localStorage.getItem('edm:sectionTitles');
+      if (savedTitles) setSectionTitles(JSON.parse(savedTitles));
+      const savedHeroPads = localStorage.getItem('edm:heroClonePaddings');
+      if (savedHeroPads) {
+        const obj = JSON.parse(savedHeroPads) as Record<string,PaddingValue>;
+        setHeroClonePaddings(new Map(Object.entries(obj).map(([k,v]) => [Number(k), v])));
+      }
+      const savedBannerPads = localStorage.getItem('edm:bannerClonePaddings');
+      if (savedBannerPads) {
+        const obj = JSON.parse(savedBannerPads) as Record<string,PaddingValue>;
+        setBannerClonePaddings(new Map(Object.entries(obj).map(([k,v]) => [Number(k), v])));
+      }
+    } catch {}
+  }, []);
+  // Persist titles
+  useEffect(() => {
+    try { if (typeof window !== 'undefined') localStorage.setItem('edm:sectionTitles', JSON.stringify(sectionTitles)); } catch {}
+  }, [sectionTitles]);
+  // Persist hero clone paddings
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return;
+      const obj: Record<number,PaddingValue> = {} as any;
+      heroClonePaddings.forEach((v,k)=>{ obj[k]=v; });
+      localStorage.setItem('edm:heroClonePaddings', JSON.stringify(obj));
+    } catch {}
+  }, [heroClonePaddings]);
+  // Persist banner clone paddings
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return;
+      const obj: Record<number,PaddingValue> = {} as any;
+      bannerClonePaddings.forEach((v,k)=>{ obj[k]=v; });
+      localStorage.setItem('edm:bannerClonePaddings', JSON.stringify(obj));
+    } catch {}
+  }, [bannerClonePaddings]);
+  // ESC key closes active clone selector
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setActiveBannerCloneSelector(null); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+  const defaultTitleFor = (id: string) => {
+    if (id === 'hero') return 'Hero';
+    if (id === 'banner') return 'Banner';
+    if (id === 'header') return 'Header';
+    if (id === 'footer') return 'Footer';
+    if (id.startsWith('body-')) return 'Body Section';
+    if (id.startsWith('hero-clone-')) return 'Hero Clone';
+    if (id.startsWith('banner-clone-')) return 'Banner Clone';
+    return 'Section';
+  };
+  const resolveTitle = (id: string, suffix?: string) => {
+    const base = sectionTitles[id] || defaultTitleFor(id);
+    return suffix ? `${base} ${suffix}` : base;
+  };
+  // Cloneable hero & banner sections
+  type HeroClone = { id: number; image: string; alt: string; href: string; templateId: string };
+  type BannerClone = { id: number; image: string; alt: string; href: string; templateId: string };
+  const [heroClones, setHeroClones] = useState<HeroClone[]>([]);
+  const [bannerClones, setBannerClones] = useState<BannerClone[]>([]);
 
   const onHeroPaddingChange = useCallback((p: PaddingValue) => setHeroPadding(p), []);
   const onBannerPaddingChange = useCallback((p: PaddingValue) => setBannerPadding(p), []);
@@ -2125,6 +2471,8 @@ const toggleCodeSection = (key: string) => {
   const [bannerHref, setBannerHref] = useState<string>('');
   // Banner image selector overlay state (main preview)
   const [showBannerSelector, setShowBannerSelector] = useState<boolean>(false);
+  // Active banner clone id currently showing the alternative image selector overlay
+  const [activeBannerCloneSelector, setActiveBannerCloneSelector] = useState<number | null>(null);
   const [bannerHtml, setBannerHtml] = useState<string>('');
   const [bannerEditMode, setBannerEditMode] = useState<boolean>(false);
   const [draftBannerHtml, setDraftBannerHtml] = useState<string>('');
@@ -2721,20 +3069,29 @@ const toggleCodeSection = (key: string) => {
       // Apply padding once to a single outer wrapper around the whole section
       bodyHtmlMap[`body-${section.id}`] = wrapSectionWithWrapper(sectionHtml, getBodySectionPadding(section.id));
     });
-    // Compose banner if an image has been fetched
+    // Compose banner (primary)
     let bannerStr = '';
     const bannerTemplate = bannerTemplates.find((t) => t.id === selectedBannerId);
     if (showBannerSection && bannerTemplate && bannerImage) {
-      const data: any = {
-        bannerImage,
-        bannerAlt: bannerAlt || '',
-        bannerHref: bannerHref || ''
-      };
+      const data: any = { bannerImage, bannerAlt: bannerAlt || '', bannerHref: bannerHref || '' };
       if (!data.bannerAlt && brandName) data.bannerAlt = brandName;
-  bannerStr = renderTemplate(bannerTemplate as any, data);
-  bannerStr = applyBrandColoursAndFont(bannerStr);
-  bannerStr = applyWrapperPadding(bannerStr, bannerPadding);
+      bannerStr = renderTemplate(bannerTemplate as any, data);
+      bannerStr = applyBrandColoursAndFont(bannerStr);
+      bannerStr = applyWrapperPadding(bannerStr, bannerPadding);
     }
+    // Compose banner clones
+    const bannerCloneHtml: Record<string,string> = {};
+    bannerClones.forEach(clone => {
+      const tpl = bannerTemplates.find(t => t.id === clone.templateId) || bannerTemplate;
+      if (!tpl) return;
+      if (!clone.image) return; // skip empty clones
+      const data: any = { bannerImage: clone.image, bannerAlt: clone.alt || brandName || '', bannerHref: clone.href || '' };
+      let html = renderTemplate(tpl as any, data);
+      html = applyBrandColoursAndFont(html);
+      const pad = bannerClonePaddings.get(clone.id) || bannerPadding;
+      html = applyWrapperPadding(html, pad);
+      bannerCloneHtml[`banner-clone-${clone.id}`] = html;
+    });
     // Compose footer
     let footerStr = '';
     if (showFooterSection) {
@@ -2743,11 +3100,26 @@ const toggleCodeSection = (key: string) => {
     footerStr = applyBrandColoursAndFont(footerStr);
     footerStr = applyWrapperPadding(footerStr, footerPadding);
     }
+    // Compose hero clones
+    const heroCloneHtml: Record<string,string> = {};
+    heroClones.forEach(clone => {
+      const tpl = heroTemplates.find(t => t.id === clone.templateId) || heroTemplate;
+      if (!tpl) return;
+      if (!clone.image) return; // skip empty
+      const data: any = { heroImage: clone.image, heroAlt: clone.alt || brandName || '', heroHref: clone.href || '' };
+      let html = renderTemplate(tpl as any, data);
+      html = applyBrandColoursAndFont(html);
+      const pad = heroClonePaddings.get(clone.id) || heroPadding;
+      html = applyWrapperPadding(html, pad);
+      heroCloneHtml[`hero-clone-${clone.id}`] = html;
+    });
     let orderedHtml = '';
     sectionOrder.forEach((id) => {
       if (id === 'hero') orderedHtml += heroStr;
       else if (id === 'banner') orderedHtml += bannerStr;
       else if (id.startsWith('body-')) orderedHtml += bodyHtmlMap[id] || '';
+      else if (id.startsWith('hero-clone-')) orderedHtml += heroCloneHtml[id] || '';
+      else if (id.startsWith('banner-clone-')) orderedHtml += bannerCloneHtml[id] || '';
     });
 
   setHeaderHtml(headerStr);
@@ -2777,9 +3149,11 @@ const toggleCodeSection = (key: string) => {
     heroImage,
     heroAlt,
     heroHref,
-    bannerImage,
+  bannerImage,
     bannerAlt,
     bannerHref,
+  heroClones,
+  bannerClones,
     selectedHeroId,
     heroTemplates,
     showHeaderSection,
@@ -2791,6 +3165,8 @@ const toggleCodeSection = (key: string) => {
     headerPadding,
     heroPadding,
     bannerPadding,
+    heroClonePaddings,
+    bannerClonePaddings,
     footerPadding
   ]);
 
@@ -3072,6 +3448,67 @@ const toggleCodeSection = (key: string) => {
     }));
     // Optionally notify (commented out for noise reduction)
     // addNotification('Removed product URL');
+  };
+
+  // --- Hero / Banner cloning helpers ---
+  const nextCloneId = (items: { id: number }[]) => (items.length ? Math.max(...items.map(i => i.id)) + 1 : 1);
+
+  const cloneHeroSection = () => {
+    setHeroClones(prev => {
+      const id = nextCloneId(prev);
+      const templateId = selectedHeroId || (heroTemplates[0]?.id ?? '');
+      const newClone: HeroClone = { id, image: heroImage, alt: heroAlt, href: heroHref, templateId };
+      // Initialize padding for this clone based on current heroPadding
+      setHeroClonePaddings(p => new Map(p).set(id, { ...heroPadding }));
+      setSectionOrder(o => {
+        const existing = [...o];
+        const heroIndex = existing.indexOf('hero');
+        if (heroIndex !== -1) {
+          existing.splice(heroIndex + 1, 0, `hero-clone-${id}`);
+        } else {
+          existing.unshift(`hero-clone-${id}`);
+        }
+        return existing;
+      });
+      return [...prev, newClone];
+    });
+  };
+
+  const removeHeroClone = (id: number) => {
+    setHeroClones(prev => prev.filter(c => c.id !== id));
+    setSectionOrder(o => o.filter(s => s !== `hero-clone-${id}`));
+  };
+
+  const cloneBannerSection = () => {
+    setBannerClones(prev => {
+      const id = nextCloneId(prev);
+      const templateId = selectedBannerId || (bannerTemplates[0]?.id ?? '');
+      const newClone: BannerClone = { id, image: bannerImage, alt: bannerAlt, href: bannerHref, templateId };
+      setBannerClonePaddings(p => new Map(p).set(id, { ...bannerPadding }));
+      setSectionOrder(o => {
+        const existing = [...o];
+        const bannerIndex = existing.indexOf('banner');
+        if (bannerIndex !== -1) {
+          existing.splice(bannerIndex + 1, 0, `banner-clone-${id}`);
+        } else {
+          existing.unshift(`banner-clone-${id}`);
+        }
+        return existing;
+      });
+      return [...prev, newClone];
+    });
+  };
+
+  const removeBannerClone = (id: number) => {
+    setBannerClones(prev => prev.filter(c => c.id !== id));
+    setSectionOrder(o => o.filter(s => s !== `banner-clone-${id}`));
+  };
+
+  const updateHeroCloneField = (id: number, field: keyof Omit<HeroClone,'id'>, value: string) => {
+    setHeroClones(prev => prev.map(c => c.id === id ? { ...c, [field]: value } as HeroClone : c));
+  };
+  const updateBannerCloneField = (id: number, field: keyof Omit<BannerClone,'id'>, value: string) => {
+    setBannerClones(prev => prev.map(c => c.id === id ? { ...c, [field]: value } as BannerClone : c));
   };
 
   /**
@@ -3357,6 +3794,10 @@ const toggleCodeSection = (key: string) => {
     setBodySections([]);
     setDraftUrls({});
     setSectionOrder(['hero','banner']);
+    setHeroClones([]);
+    setBannerClones([]);
+  setHeroClonePaddings(new Map());
+  setBannerClonePaddings(new Map());
     setOpenSection('');
     setShowHeaderSection(true);
     setShowHeroSection(true);
@@ -3832,7 +4273,9 @@ const toggleCodeSection = (key: string) => {
               sensors={sensors}
               collisionDetection={closestCenter}
               modifiers={[restrictToVerticalAxis]}
-              onDragEnd={handleSectionDragEnd}
+              onDragStart={({active})=> setActiveDragId(String(active.id))}
+              onDragEnd={(evt)=>{ handleSectionDragEnd(evt); setActiveDragId(null); }}
+              onDragCancel={()=> setActiveDragId(null)}
             >
               <SortableContext items={sectionOrder} strategy={verticalListSortingStrategy}>
                 {sectionOrder.map((id) => {
@@ -3844,6 +4287,18 @@ const toggleCodeSection = (key: string) => {
                     const isOpen = openSection === 'banner';
                     return <MemoizedSortableBannerSection key="banner" isOpen={isOpen} />;
                   }
+                  if (id.startsWith('hero-clone-')) {
+                    const cloneId = Number(id.replace('hero-clone-',''));
+                    const clone = heroClones.find(c => c.id === cloneId);
+                    if (!clone) return null;
+                    return <MemoizedSortableHeroCloneSection key={id} clone={clone} isOpen={openSection === id} />;
+                  }
+                  if (id.startsWith('banner-clone-')) {
+                    const cloneId = Number(id.replace('banner-clone-',''));
+                    const clone = bannerClones.find(c => c.id === cloneId);
+                    if (!clone) return null;
+                    return <MemoizedSortableBannerCloneSection key={id} clone={clone} isOpen={openSection === id} />;
+                  }
                   if (id.startsWith('body-')) {
                     const section = bodySections.find((s) => `body-${s.id}` === id);
                     if (!section) return null;
@@ -3853,13 +4308,27 @@ const toggleCodeSection = (key: string) => {
                   return null;
                 })}
               </SortableContext>
+              <DragOverlay dropAnimation={{ duration:180, easing:'cubic-bezier(.2,.8,.2,1)' }}>
+                {activeDragId ? (() => {
+                  const id = activeDragId;
+                  const baseStyle: React.CSSProperties = { boxSizing:'border-box', width:'100%', maxWidth:640, background:'#fff', borderRadius:6, boxShadow:'0 8px 24px rgba(0,0,0,0.25)', padding:'8px 12px', opacity:0.98, fontFamily:'inherit' };
+                  
+                  return null;
+                })() : null}
+              </DragOverlay>
             </DndContext>
 
             {/* Footer section */}
             {showFooterSection && (
               <SectionAccordion
                 id="left-footer"
-                title="Footer"
+                title={renamingId==='footer' ? (
+                  <Box sx={{ display:'flex', alignItems:'center', gap:1, width:'100%' }} onClick={(e)=>e.stopPropagation()}>
+                    <TextField size="small" autoFocus value={renameDraft} onChange={(e)=>setRenameDraft(e.target.value)} onKeyDown={(e)=>{ if(e.key==='Enter'){ commitRename(); } else if(e.key==='Escape'){ cancelRename(); } }} variant="standard" placeholder="Footer" sx={{ flex:1 }} />
+                    <IconButton size="small" onClick={(e)=>{ e.stopPropagation(); commitRename(); }}><SaveIcon fontSize="small" /></IconButton>
+                    <IconButton size="small" onClick={(e)=>{ e.stopPropagation(); cancelRename(); }}><CloseIcon2 fontSize="small" /></IconButton>
+                  </Box>
+                ) : resolveTitle('footer')}
                 expanded={openSection === 'footer'}
                 onToggle={() => handleAccordionToggle('footer')}
                 actions={
@@ -3867,6 +4336,7 @@ const toggleCodeSection = (key: string) => {
                     items={[
                       { label: 'Move up', icon: <ArrowUpwardIcon fontSize="small" />, disabled: true },
                       { label: 'Move down', icon: <ArrowDownwardIcon fontSize="small" />, disabled: true },
+                      { label: 'Rename', icon: <EditIcon fontSize="small" />, onClick: () => beginRename('footer', resolveTitle('footer')) },
                       { label: 'Clone', icon: <ContentCopyIcon fontSize="small" />, disabled: true },
                       { label: 'Delete', icon: <DeleteIcon fontSize="small" />, onClick: () => removeFooterSection() },
                     ]}
@@ -4886,8 +5356,8 @@ const toggleCodeSection = (key: string) => {
                 <Box>
                   <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 1 }}>Brand colors</Typography>
                   <Stack direction="row" spacing={1}>
-                    <MuiColorInput id="brand-primary" name="brand-primary" label="Primary" format="hex" value={brandPrimary} onChange={(value) => setBrandPrimary(value || brandPrimary)} size="small" />
-                    <MuiColorInput id="brand-secondary" name="brand-secondary" label="Secondary" format="hex" value={brandSecondary} onChange={(value) => setBrandSecondary(value || brandSecondary)} size="small" />
+                    <MuiColorInput id="brand-primary" name="brand-primary" label="CTA" format="hex" value={brandPrimary} onChange={(value) => setBrandPrimary(value || brandPrimary)} size="small" />
+                    <MuiColorInput id="brand-secondary" name="brand-secondary" label="Announcement Bar" format="hex" value={brandSecondary} onChange={(value) => setBrandSecondary(value || brandSecondary)} size="small" />
                   </Stack>
                 </Box>
 
@@ -5107,7 +5577,7 @@ const toggleCodeSection = (key: string) => {
                         </div>
                       )
                     )}
-                    {sectionOrder.map((id) => {
+              {sectionOrder.map((id) => {
                        if (id === 'hero' && showHeroSection) {
                          return heroImage && !debouncedLoading ? (
                            <div key="hero" data-section="hero">
@@ -5141,6 +5611,42 @@ const toggleCodeSection = (key: string) => {
                            />
                          );
                        }
+                      if (id.startsWith('hero-clone-')) {
+                        const cloneId = Number(id.replace('hero-clone-',''));
+                        const clone = heroClones.find(c => c.id === cloneId);
+                        if (!clone) return null;
+                        return clone.image && !debouncedLoading ? (
+                          <div key={id} data-section={id} onClick={() => setOpenSection(id)}>
+                            <HeroTableModule
+                              heroImage={clone.image}
+                              heroAlt={clone.alt || brandName}
+                              heroHref={clone.href}
+                              heroImages={heroImages}
+                              updateHero={(field, value) => updateHeroCloneField(cloneId, field as any, value)}
+                              templateId={clone.templateId}
+                              onActivate={() => setOpenSection(id)}
+                              wrapperPadding={heroClonePaddings.get(cloneId) || heroPadding}
+                            />
+                          </div>
+                        ) : (
+                          <Skeleton
+                            key={`${id}-skel`}
+                            variant="rectangular"
+                            animation={skelAnim}
+                            sx={{
+                              mb: 2,
+                              width: '100%',
+                              maxWidth: 600,
+                              mx: 'auto',
+                              height: previewMode === 'mobile' ? 140 : 180,
+                              borderRadius: 2,
+                              boxShadow: 'var(--shadow-light)',
+                              paddingTop: `${(heroClonePaddings.get(cloneId) || heroPadding).top ?? 0}px`,
+                              paddingBottom: `${(heroClonePaddings.get(cloneId) || heroPadding).bottom ?? 0}px`
+                            }}
+                          />
+                        );
+                      }
                       if (id === 'banner' && showBannerSection) {
                         return bannerImage && !debouncedLoading ? (
                           <div
@@ -5294,6 +5800,125 @@ const toggleCodeSection = (key: string) => {
                               boxShadow: 'var(--shadow-light)',
                               paddingTop: `${bannerPadding.top ?? 0}px`,
                               paddingBottom: `${bannerPadding.bottom ?? 0}px`
+                            }}
+                          />
+                        );
+                      }
+                      if (id.startsWith('banner-clone-')) {
+                        const cloneId = Number(id.replace('banner-clone-',''));
+                        const clone = bannerClones.find(c => c.id === cloneId);
+                        if (!clone) return null;
+                        return clone.image && !debouncedLoading ? (
+                          <div
+                            key={id}
+                            data-section={id}
+                            onClick={() => setOpenSection(id)}
+                            style={{ position: 'relative' }}
+                          >
+                            <table role="presentation" width="100%" cellPadding={0} cellSpacing={0} border={0} align="center" style={{ margin:0, padding:0 }}>
+                              <tbody><tr><td align="center" style={{ margin:0, padding:0 }}>
+                                <table role="presentation" width="100%" cellPadding={0} cellSpacing={0} border={0} style={{ maxWidth:'600px', margin:'0 auto', width:'100%' }}>
+                                  <tbody><tr><td style={{ padding: `${(bannerClonePaddings.get(cloneId)||bannerPadding).top ?? 0}px ${(bannerClonePaddings.get(cloneId)||bannerPadding).right ?? 0}px ${(bannerClonePaddings.get(cloneId)||bannerPadding).bottom ?? 0}px ${(bannerClonePaddings.get(cloneId)||bannerPadding).left ?? 0}px` }}>
+                                    <div
+                                      className={`banner-image-wrapper${(analyzeData?.bannerImages?.length || 0) > 0 ? ' selectable' : ''}`}
+                                      style={{ position:'relative', cursor:(analyzeData?.bannerImages?.length||0)>0?'pointer':'default', overflow:'hidden' }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setOpenSection(id);
+                                        if ((analyzeData?.bannerImages?.length || 0) > 0) {
+                                          setActiveBannerCloneSelector(cloneId);
+                                        }
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        const img = e.currentTarget.querySelector('img') as HTMLImageElement | null;
+                                        const editIcon = e.currentTarget.querySelector('.edit-icon') as HTMLDivElement | null;
+                                        if (img) img.style.opacity = '0.7';
+                                        if (editIcon) editIcon.style.transform = 'translateY(-38px)';
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        const img = e.currentTarget.querySelector('img') as HTMLImageElement | null;
+                                        const editIcon = e.currentTarget.querySelector('.edit-icon') as HTMLDivElement | null;
+                                        if (img) img.style.opacity = '1';
+                                        if (editIcon) editIcon.style.transform = 'translateY(0)';
+                                      }}
+                                    >
+                                      <img
+                                        src={clone.image}
+                                        alt={clone.alt || brandName || ''}
+                                        style={{ width:'100%', height:'auto', display:'block', borderRadius:4, cursor:(analyzeData?.bannerImages?.length||0)>0?'pointer':'default', border:'1px solid rgba(0,0,0,0.2)', transition:'opacity 0.2s ease-in-out' }}
+                                      />
+                                      {(analyzeData?.bannerImages?.length || 0) > 0 && (
+                                        <div
+                                          className="edit-icon"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setOpenSection(id);
+                                            setActiveBannerCloneSelector(cloneId);
+                                          }}
+                                          style={{
+                                            position: 'absolute',
+                                            bottom: -30,
+                                            right: 8,
+                                            backgroundColor: 'rgba(0,0,0,0.5)',
+                                            color: '#ffffff',
+                                            borderRadius: '50%',
+                                            padding: 4,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            cursor: 'pointer',
+                                            transform: 'translateY(0)',
+                                            transition: 'transform 0.3s ease-in-out'
+                                          }}
+                                          aria-label="Select banner image"
+                                          title="Select banner image"
+                                        >
+                                          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                            <path d="M14.69 3.1l6.2 6.2c.27.27.27.7 0 .97l-8.2 8.2c-.17.17-.39.26-.62.26H6.5c-.55 0-1-.45-1-1v-5.57c0-.23.09-.45.26-.62l8.2-8.2c.27-.27.7-.27.97 0zM5 20h14v2H5v-2z" />
+                                          </svg>
+                                        </div>
+                                      )}
+                                    </div>
+                                    {activeBannerCloneSelector === cloneId && (() => {
+                                      const previewPanel = typeof window !== 'undefined' ? (document.getElementById('preview') as HTMLElement) : null;
+                                      const rect = previewPanel?.getBoundingClientRect() || undefined;
+                                      const imgs = uniqueImages((analyzeData?.bannerImages || []) as string[]);
+                                      return (
+                                        <ImageSelector
+                                          images={imgs}
+                                          selected={clone.image}
+                                          open={true}
+                                          onSelect={(img) => {
+                                            updateBannerCloneField(cloneId, 'image', img);
+                                            updateBannerCloneField(cloneId, 'href', brandWebsite || '');
+                                            updateBannerCloneField(cloneId, 'alt', analyzeData?.storeName || brandName || 'Brand');
+                                            setActiveBannerCloneSelector(null);
+                                          }}
+                                          onClose={() => setActiveBannerCloneSelector(null)}
+                                          anchorRect={rect}
+                                        />
+                                      );
+                                    })()}
+                                  </td></tr></tbody>
+                                </table>
+                              </td></tr></tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <Skeleton
+                            key={`${id}-skel`}
+                            variant="rectangular"
+                            animation={skelAnim}
+                            sx={{
+                              mb: 2,
+                              width: '100%',
+                              maxWidth: 600,
+                              mx: 'auto',
+                              height: previewMode === 'mobile' ? 120 : 160,
+                              borderRadius: 2,
+                              boxShadow: 'var(--shadow-light)',
+                              paddingTop: `${(bannerClonePaddings.get(cloneId)||bannerPadding).top ?? 0}px`,
+                              paddingBottom: `${(bannerClonePaddings.get(cloneId)||bannerPadding).bottom ?? 0}px`
                             }}
                           />
                         );
