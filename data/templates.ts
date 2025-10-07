@@ -42,6 +42,7 @@ export const defaultTemplates: Template[] = [
             <!-- Two Columns -->
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:0;padding:0;">
               <tr>
+<<<<<<< Updated upstream
                 <!-- Left: Image -->
                 <td class="stack-cols" width="50%" valign="top" style="padding:0 8px;">
                   <a href="{{cta}}" target="_blank" style="text-decoration:none;">
@@ -68,6 +69,10 @@ export const defaultTemplates: Template[] = [
 
                   <!-- CTA + Colours row -->
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;">
+=======
+                <td align="left" valign="middle" style="padding:0;width: 100%;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;" class="cta">
+>>>>>>> Stashed changes
                     <tr>
                       <!-- CTA (left) -->
                       <td align="left" valign="middle" style="padding:0;">
@@ -174,6 +179,7 @@ export const defaultTemplates: Template[] = [
             <!-- Two Columns -->
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:0;padding:0;">
               <tr>
+<<<<<<< Updated upstream
                 <!-- Left: Copy -->
                 <td class="stack-cols" width="50%" valign="top" style="padding:0 8px;">
                   <!-- Title -->
@@ -193,6 +199,10 @@ export const defaultTemplates: Template[] = [
 
                   <!-- CTA + Colours row -->
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;">
+=======
+                <td align="left" valign="middle" style="padding:0;width: 100%;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;" class="cta">
+>>>>>>> Stashed changes
                     <tr>
                       <!-- CTA (left) -->
                       <td align="left" valign="middle" style="padding:0;">

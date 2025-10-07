@@ -1887,6 +1887,7 @@ const toggleCodeSection = (key: string) => {
         setProgress(prog);
         setBuffer(Math.min(100, prog + 10));
       });
+<<<<<<< Updated upstream
       // Final composition
       setProgress(95);
       setBuffer(100);
@@ -1899,6 +1900,30 @@ const toggleCodeSection = (key: string) => {
       );
       setDraftUrls((prev) => ({ ...prev, [sectionId]: [...validUrls, ''] }));
       setProgress(100); // complete
+=======
+      // Build product list in input order, but do not drop user-entered URLs.
+      // Keep all filtered URLs in the UI, and only render products for URLs that parsed successfully.
+      const processed: ProductData[] = filtered
+        .map((urlRaw) => {
+          const url = sanitizeUrl(urlRaw);
+          return productMap.get(url) || productMap.get(urlRaw);
+        })
+        .filter((p): p is ProductData => Boolean(p));
+      const missingUrls = filtered.filter((urlRaw) => {
+        const url = sanitizeUrl(urlRaw);
+        return !productMap.has(url) && !productMap.has(urlRaw);
+      });
+      // Update section with processed products and clear loading flag
+      // Force re-render by cloning each product object (in case references reused)
+      setBodySections(prev => prev.map(s => {
+        if (s.id !== sectionId) return s;
+        return { ...s, products: processed.map(p => ({ ...p })), loading: false };
+      }));
+      // Surface any missing URLs as notifications (non-blocking)
+      if (missingUrls.length) {
+        missingUrls.forEach(m => addNotification(`No data returned for URL: ${m}`));
+      }
+>>>>>>> Stashed changes
       // Hide after a short delay to avoid flicker, then reset
       setTimeout(() => {
         setLoading(false);

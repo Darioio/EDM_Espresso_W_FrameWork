@@ -152,11 +152,20 @@ export async function parseProduct(url: string): Promise<ProductData> {
     : typeof ld.image === 'string'
     ? ld.image
     : undefined;
+<<<<<<< Updated upstream
   product.image =
     clean(ldImage) ||
     clean(getMeta($, 'og:image')) ||
     clean(getMeta($, 'twitter:image')) ||
     clean($('img').first().attr('src'));
+=======
+  product.image = normalise(
+    clean(ldImage) ||
+      clean(getMeta($, 'og:image')) ||
+      clean(getMeta($, 'twitter:image')) ||
+      clean($('img').first().attr('src'))
+  );
+>>>>>>> Stashed changes
 
   // Price
   const ldOffers = ld.offers;
