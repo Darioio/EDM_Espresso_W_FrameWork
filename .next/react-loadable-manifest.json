@@ -1,14 +1,1 @@
-{
-  "index.tsx -> prismjs": {
-    "id": "index.tsx -> prismjs",
-    "files": [
-      "static/chunks/node_modules_prismjs_prism_js.js"
-    ]
-  },
-  "index.tsx -> prismjs/components/prism-markup": {
-    "id": "index.tsx -> prismjs/components/prism-markup",
-    "files": [
-      "static/chunks/node_modules_prismjs_components_prism-markup_js.js"
-    ]
-  }
-}
+{}
